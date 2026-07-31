@@ -21,7 +21,7 @@ import {
 const DOCS_URL = 'https://docs.llm-mem.ai/telemetry';
 
 const COLLECTED_FIELDS = [
-  'version          claude-mem version (e.g. 13.4.2)',
+  'version          llm-mem version (e.g. 13.4.2)',
   'os               platform (darwin / linux / win32)',
   'os_version       OS kernel release (e.g. 10.0.22631)',
   'is_wsl           whether running under WSL',
@@ -34,7 +34,7 @@ const COLLECTED_FIELDS = [
   'error_category   coarse error bucket (never a message)',
   'locale           language tag (e.g. en-US)',
   'is_ci            whether running in CI',
-  'endpoint         which claude-mem search route (our route names)',
+  'endpoint         which llm-mem search route (our route names)',
   'ide              installer IDE choice (claude-code / cursor / ...)',
   'provider         LLM provider choice (claude / gemini / openrouter)',
   'runtime_mode     worker or server',
@@ -46,7 +46,7 @@ const COLLECTED_FIELDS = [
   'install_method   npm / bun / pnpm / yarn (launcher of the CLI)',
   'bun_version / uv_version / claude_code_version',
   '                 toolchain versions detected during install',
-  'mode             active claude-mem mode id',
+  'mode             active llm-mem mode id',
   'model            model id used for compression',
   'hook             compression trigger (init / ingest / summarize)',
   'observation_type / obs_type_*   observation type buckets (counts only)',

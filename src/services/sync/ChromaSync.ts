@@ -1061,7 +1061,7 @@ export class ChromaSync {
    * Backfill all projects that have observations in SQLite but may be missing from Chroma.
    * Uses a single shared ChromaSync('llm-mem') instance and Chroma connection.
    * Per-project scoping is passed as a parameter to ensureBackfilled(), avoiding
-   * instance state mutation. All documents land in the cm__claude-mem collection
+   * instance state mutation. All documents land in the cm__llm-mem collection
    * with project scoped via metadata, matching how DatabaseManager and SearchManager operate.
    * Designed to be called fire-and-forget on worker startup.
    *

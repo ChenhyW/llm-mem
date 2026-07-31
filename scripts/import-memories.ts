@@ -34,7 +34,7 @@ async function importMemories(inputFile: string) {
     }
   } catch (error) {
     console.error(`❌ Worker not running at ${WORKER_URL}`);
-    console.error('   Please ensure the claude-mem worker is running.');
+    console.error('   Please ensure the llm-mem worker is running.');
     process.exit(1);
   }
 

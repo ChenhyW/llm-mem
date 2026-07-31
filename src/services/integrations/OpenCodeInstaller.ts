@@ -7,7 +7,7 @@ import { logger } from '../../utils/logger.js';
 import { CONTEXT_TAG_OPEN, CONTEXT_TAG_CLOSE, injectContextIntoMarkdownFile } from '../../utils/context-injection.js';
 import { getWorkerHost, getWorkerPort } from '../../shared/worker-utils.js';
 
-const OPENCODE_PLUGIN_CONFIG_PATH = './plugins/claude-mem.js';
+const OPENCODE_PLUGIN_CONFIG_PATH = './plugins/llm-mem.js';
 
 type OpenCodeConfig = {
   $schema?: string;
@@ -35,7 +35,7 @@ export function getOpenCodeAgentsMdPath(): string {
 }
 
 export function getInstalledPluginPath(): string {
-  return path.join(getOpenCodePluginsDirectory(), 'claude-mem.js');
+  return path.join(getOpenCodePluginsDirectory(), 'llm-mem.js');
 }
 
 function getOpenCodePluginEntries(config: OpenCodeConfig): unknown[] {
@@ -281,7 +281,7 @@ export function checkOpenCodeStatus(): number {
     const content = readFileSync(agentsMdPath, 'utf-8');
     const hasContextTags = content.includes(CONTEXT_TAG_OPEN);
     console.log(`  Exists: yes`);
-    console.log(`  Has claude-mem context: ${hasContextTags ? 'yes' : 'no'}`);
+    console.log(`  Has llm-mem context: ${hasContextTags ? 'yes' : 'no'}`);
   } else {
     console.log(`  Exists: no`);
   }
@@ -302,7 +302,7 @@ export async function installOpenCodeIntegration(): Promise<number> {
 
 *No context yet. Complete your first session and context will appear here.*
 
-Use claude-mem search tools for manual memory queries.`;
+Use llm-mem search tools for manual memory queries.`;
 
   let contextToInject = placeholderContext;
   let contextSource = 'placeholder';
@@ -338,7 +338,7 @@ Plugin installed to: ${getInstalledPluginPath()}
 Context file: ${getOpenCodeAgentsMdPath()}
 
 Next steps:
-  1. Start claude-mem worker: npx claude-mem start
+  1. Start llm-mem worker: npx llm-mem start
   2. Restart OpenCode to load the plugin
   3. Memory capture is automatic from then on
 `);

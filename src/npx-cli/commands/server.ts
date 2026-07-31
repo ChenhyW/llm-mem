@@ -14,7 +14,7 @@ import {
 } from './runtime.js';
 
 function printServerUsage(): void {
-  console.error(`Usage: ${styleText('bold', 'npx claude-mem server <command>')}`);
+  console.error(`Usage: ${styleText('bold', 'npx llm-mem server <command>')}`);
   console.error('Commands: start, stop, restart, status, api-key create|list|revoke, keys rotate, worker start, jobs status|failed|retry|cancel');
 }
 
@@ -75,7 +75,7 @@ export async function runServerCommand(argv: string[] = []): Promise<void> {
       return;
     }
     console.error(styleText('red', `Unknown server api-key subcommand: ${apiKeyCommand ?? '(none)'}`));
-    console.error('Usage: npx claude-mem server api-key create|list|revoke');
+    console.error('Usage: npx llm-mem server api-key create|list|revoke');
     process.exit(1);
   }
 
@@ -86,7 +86,7 @@ export async function runServerCommand(argv: string[] = []): Promise<void> {
       return;
     }
     console.error(styleText('red', `Unknown server worker subcommand: ${workerCommand ?? '(none)'}`));
-    console.error('Usage: npx claude-mem server worker start');
+    console.error('Usage: npx llm-mem server worker start');
     process.exit(1);
   }
 
@@ -97,7 +97,7 @@ export async function runServerCommand(argv: string[] = []): Promise<void> {
       return;
     }
     console.error(styleText('red', `Unknown server keys subcommand: ${keysCommand ?? '(none)'}`));
-    console.error('Usage: npx claude-mem server keys rotate');
+    console.error('Usage: npx llm-mem server keys rotate');
     process.exit(1);
   }
 
@@ -178,7 +178,7 @@ export function runWorkerAliasCommand(argv: string[] = []): void {
 
   if (!subCommand || !runWorkerLifecycleCommand(subCommand)) {
     console.error(styleText('red', `Unknown worker command: ${subCommand ?? '(none)'}`));
-    console.error('Usage: npx claude-mem worker start|stop|restart|status');
+    console.error('Usage: npx llm-mem worker start|stop|restart|status');
     process.exit(1);
   }
 }

@@ -100,7 +100,7 @@ async function main(): Promise<void> {
   kv(['delete', KILL_KEY]);
   log({ event: 'start', hub: HUB, user: USER });
 
-  const tempDir = mkdtempSync(join(tmpdir(), 'claude-mem-kill-e2e-'));
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-mem-kill-e2e-'));
   const dbA = new Database(':memory:');
   const dbB = new Database(':memory:');
   new SessionStore(dbA);

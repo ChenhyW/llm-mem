@@ -951,7 +951,7 @@ function runServerServiceCli(command: string, extraArgs: string[] = []): void {
       serverScript = legacyScript;
     } else {
       console.error(`Server script not found at: ${serverScript}`);
-      console.error('Rebuild or reinstall claude-mem so server-service.cjs is available.');
+      console.error('Rebuild or reinstall llm-mem so server-service.cjs is available.');
       process.exit(1);
     }
   }
@@ -1349,7 +1349,7 @@ async function main() {
       const platform = process.argv[3];
       const event = process.argv[4];
       if (!platform || !event) {
-        console.error('Usage: claude-mem hook <platform> <event>');
+        console.error('Usage: llm-mem hook <platform> <event>');
         console.error('Platforms: claude-code, codex, cursor, antigravity-cli, raw');
         console.error('Events: context, session-init, observation, summarize, user-message');
         process.exit(1);
@@ -1384,7 +1384,7 @@ async function main() {
     case 'transcript': {
       // npx-cli falls back to `worker-service.cjs transcript <sub>` when the
       // standalone `transcript-watcher.cjs` is not present in the bundle
-      // (see thedotmack/claude-mem 2450). Dispatch to the shared
+      // (see thedotmack/llm-mem 2450). Dispatch to the shared
       // implementation so `init`, `watch`, and `validate` all work
       // regardless of which entry point the user invokes.
       const { runTranscriptCommand } = await import('./transcripts/cli.js');
@@ -1547,7 +1547,7 @@ export function formatDependencyHealthHint(health: WorkerHealthSnapshot): string
     return `${status.dependency}: ${status.kind}`;
   });
 
-  return `  Dependencies: degraded (${labels.join(', ')}). Run npx claude-mem doctor or open Settings for remediation.`;
+  return `  Dependencies: degraded (${labels.join(', ')}). Run npx llm-mem doctor or open Settings for remediation.`;
 }
 
 /**

@@ -32,7 +32,7 @@ async function httpRequestToWorker(
 
 export async function isPortInUse(port: number): Promise<boolean> {
   if (process.platform === 'win32') {
-    // Fast path: HTTP health check. A live claude-mem worker responds to
+    // Fast path: HTTP health check. A live llm-mem worker responds to
     // /api/health, so this is the cheapest non-disruptive probe for the
     // common case (worker is running and healthy).
     try {

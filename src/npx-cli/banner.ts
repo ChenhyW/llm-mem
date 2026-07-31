@@ -35,7 +35,7 @@ function getFrames(): string[] {
     frames = raw.split(FRAME_SEP).filter(Boolean);
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.warn('claude-mem: banner frame decoding failed, skipping banner:', err);
+    console.warn('llm-mem: banner frame decoding failed, skipping banner:', err);
     frames = [];
   }
   return frames;

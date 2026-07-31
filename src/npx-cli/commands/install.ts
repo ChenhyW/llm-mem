@@ -190,7 +190,7 @@ function registerPlugin(version: string): void {
   const cachePath = pluginCacheDirectory(version);
   const now = new Date().toISOString();
 
-  installedPlugins.plugins['claude-mem@thedotmack'] = [
+  installedPlugins.plugins['llm-mem@thedotmack'] = [
     {
       scope: 'user',
       installPath: cachePath,
@@ -207,16 +207,16 @@ function enablePluginInClaudeSettings(): void {
   const settings = readJsonSafe<Record<string, any>>(claudeSettingsPath(), {});
 
   if (!settings.enabledPlugins) settings.enabledPlugins = {};
-  settings.enabledPlugins['claude-mem@thedotmack'] = true;
+  settings.enabledPlugins['llm-mem@thedotmack'] = true;
 
   writeJsonFileAtomic(claudeSettingsPath(), settings);
 }
 
 /**
  * Disable Claude Code's built-in auto-memory by setting CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
- * in ~/.claude/settings.json `env` block. claude-mem provides its own persistent memory
+ * in ~/.claude/settings.json `env` block. llm-mem provides its own persistent memory
  * via plugin hooks; the built-in MEMORY.md system creates shadow state outside the user's
- * control and competes with claude-mem for context window tokens.
+ * control and competes with llm-mem for context window tokens.
  *
  * Per anthropics/claude-code#23544, the env var is the only supported toggle.
  *
@@ -266,7 +266,7 @@ async function resolveClaudeAutoMemoryChoice(
       {
         value: 'disable',
         label: 'Disable auto-memory',
-        hint: 'Only if you explicitly want claude-mem to replace native startup memory.',
+        hint: 'Only if you explicitly want llm-mem to replace native startup memory.',
       },
     ],
     initialValue: 'leave-enabled',
@@ -319,7 +319,7 @@ function makeIDETask(ideId: string, summary: InstallSummary): TaskDescriptor | n
           if (mcpResult === 0) {
             return `Cursor: hooks + MCP installed ${styleText('green', 'OK')}`;
           }
-          return `Cursor: hooks installed; MCP setup failed — run \`npx claude-mem cursor mcp\` ${styleText('yellow', '!')}`;
+          return `Cursor: hooks installed; MCP setup failed — run \`npx llm-mem cursor mcp\` ${styleText('yellow', '!')}`;
         },
       };
     }
@@ -522,7 +522,7 @@ function applyClaudeCodePathSetupIfNeeded(): void {
   } else {
     try {
       const trailing = existing.length === 0 || existing.endsWith('\n') ? '' : '\n';
-      const block = `${trailing}\n# Added by claude-mem installer for Claude Code\n${exportLine}\n`;
+      const block = `${trailing}\n# Added by llm-mem installer for Claude Code\n${exportLine}\n`;
       writeFileSync(configFile, existing + block, 'utf-8');
       log.success(`Added Claude Code to PATH in ${configFile}`);
     } catch (error: unknown) {
@@ -865,7 +865,7 @@ async function promptRuntime(options: InstallOptions): Promise<RuntimeId> {
   }
 
   const selected = await p.select<RuntimeId>({
-    message: 'Which runtime should claude-mem start after install?',
+    message: 'Which runtime should llm-mem start after install?',
     options: [
       { value: 'worker', label: 'Worker', hint: 'stable compatibility path' },
       { value: 'server', label: 'Server (beta)', hint: 'REST V1, API keys, team-ready storage' },
@@ -900,7 +900,7 @@ async function setupServerRuntimeNonInteractive(options: InstallOptions): Promis
 
   log.info(
     'Server runtime selected. Bring up the bundled stack with '
-      + '`docker compose up -d postgres valkey claude-mem-server claude-mem-worker` '
+      + '`docker compose up -d postgres valkey llm-mem-server llm-mem-worker` '
       + `(pg + redis/valkey). The server listens at ${serverBaseUrl}.`,
   );
 
@@ -917,11 +917,11 @@ async function setupServerRuntimeNonInteractive(options: InstallOptions): Promis
 async function maybeBootstrapServerApiKey(): Promise<void> {
   // Only attempt if Postgres is configured. Without DATABASE_URL we cannot
   // reach the api_keys table — the operator must configure the server first
-  // and rerun `claude-mem server keys rotate`.
+  // and rerun `llm-mem server keys rotate`.
   if (!process.env.LLM_MEM_SERVER_DATABASE_URL) {
     log.warn(
       'Skipping local hook API key bootstrap: LLM_MEM_SERVER_DATABASE_URL is not set. '
-        + 'Run `npx claude-mem server keys rotate` after configuring Postgres to provision a key.',
+        + 'Run `npx llm-mem server keys rotate` after configuring Postgres to provision a key.',
     );
     return;
   }
@@ -931,7 +931,7 @@ async function maybeBootstrapServerApiKey(): Promise<void> {
     // [ANTI-PATTERN IGNORED]: the failure is already surfaced to the user via the interactive-aware log.warn wrapper below (p.log.warn in a TTY, console.warn otherwise), including the manual remediation command.
     log.warn(
       `Failed to bootstrap server API key: ${error instanceof Error ? error.message : String(error)}. `
-        + 'Hooks will fall back to the worker until you run `npx claude-mem server keys rotate`.',
+        + 'Hooks will fall back to the worker until you run `npx llm-mem server keys rotate`.',
     );
   }
 }
@@ -970,7 +970,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
       ANTHROPIC_BASE_URL: '',
       ANTHROPIC_AUTH_TOKEN: '',
     });
-    log.info('Configured claude-mem to use your logged-in Claude SDK account.');
+    log.info('Configured llm-mem to use your logged-in Claude SDK account.');
   };
 
   const configureDirectApiKey = async (): Promise<void> => {
@@ -1104,7 +1104,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
     }
 
     const apiModeResult = await p.select<ClaudeApiMode>({
-      message: 'How should claude-mem connect?',
+      message: 'How should llm-mem connect?',
       options: [
         { value: 'direct', label: 'Anthropic API key' },
         { value: 'gateway', label: 'LiteLLM or custom gateway' },
@@ -1240,7 +1240,7 @@ async function promptClaudeModel(options: InstallOptions): Promise<void> {
   const initialValue = allowed.has(initialModel) ? initialModel : 'claude-haiku-4-5-20251001';
 
   const result = await p.select<string>({
-    message: 'Which Claude model should claude-mem use to compress observations?\nThis runs whenever you and Claude touch a file — keep it cheap and fast.',
+    message: 'Which Claude model should llm-mem use to compress observations?\nThis runs whenever you and Claude touch a file — keep it cheap and fast.',
     options: [
       { value: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 (recommended — fast, cheap, great for compression)' },
       { value: 'claude-sonnet-5', label: 'Sonnet 5 (balanced quality and cost)' },
@@ -1467,7 +1467,7 @@ export async function runInstallCommand(options: InstallOptions = {}): Promise<v
       if (isInteractive) {
         p.log.error(headline);
         p.log.error(err.remediation);
-        p.outro(styleText('red', 'claude-mem installation aborted.'));
+        p.outro(styleText('red', 'llm-mem installation aborted.'));
       } else {
         console.error(`\n  ${headline}`);
         console.error(`  ${err.remediation}`);
@@ -1489,9 +1489,9 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
 
   if (isInteractive) {
     await playBanner();
-    p.intro(styleText(['bgCyan', 'black'], ' claude-mem install '));
+    p.intro(styleText(['bgCyan', 'black'], ' llm-mem install '));
   } else {
-    console.log('claude-mem install');
+    console.log('llm-mem install');
   }
   const marketplaceDir = marketplaceDirectory();
   const alreadyInstalled = existsSync(join(marketplaceDir, 'plugin', '.claude-plugin', 'plugin.json'));
@@ -1713,7 +1713,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
   }
 
   // The server runtime is brought up via its own stack (Docker pg+redis +
-  // `claude-mem server start`), NOT the worker-service spawner. Skip the
+  // `llm-mem server start`), NOT the worker-service spawner. Skip the
   // worker-only autostart entirely so the server runtime never invokes the
   // worker path (#2543).
   const autoStartSkipped = !isInteractive || options.noAutoStart || selectedRuntime === 'server';
@@ -1723,7 +1723,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
       title: selectedRuntime === 'server' ? 'Starting server daemon' : 'Starting worker daemon',
       task: async (message) => {
         if (selectedRuntime === 'server') {
-          return `Server runtime selected — start it with ${styleText('bold', 'npx claude-mem server start')} ${styleText('dim', '(or via Docker compose)')}`;
+          return `Server runtime selected — start it with ${styleText('bold', 'npx llm-mem server start')} ${styleText('dim', '(or via Docker compose)')}`;
         }
         if (autoStartSkipped) {
           return isInteractive
@@ -1744,7 +1744,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
           case 'warming':
             return `Worker starting on port ${port} — finishing in background ${styleText('yellow', '⏳')}`;
           case 'dead':
-            return `Worker did not start — try \`npx claude-mem start\` manually ${styleText('yellow', '!')}`;
+            return `Worker did not start — try \`npx llm-mem start\` manually ${styleText('yellow', '!')}`;
         }
       },
     },
@@ -1826,7 +1826,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
   const finalWorkerState = workerStartResult as WorkerStartResult;
   const workerAlive = finalWorkerState !== 'dead' || workerReady;
   const runtimeLabel = selectedRuntime === 'server' ? 'Server' : 'Worker';
-  const runtimeStartCommand = selectedRuntime === 'server' ? 'npx claude-mem server start' : 'npx claude-mem start';
+  const runtimeStartCommand = selectedRuntime === 'server' ? 'npx llm-mem server start' : 'npx llm-mem start';
   const workerBaseUrl = `http://${workerUrlHost}:${actualPort}`;
   const configuredWorkerBaseUrl = `http://${workerUrlHost}:${workerPort}`;
   const workerHeadline = autoStartSkipped
@@ -1836,7 +1836,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
       : `${styleText('yellow', '⏳')} ${runtimeLabel} starting at ${styleText('underline', workerBaseUrl)} — give it ~30s, then refresh`;
   const nextStepsHeadline = autoStartSkipped || workerAlive
     ? workerHeadline
-    : `${styleText('yellow', '!')} Worker not yet ready on port ${styleText('cyan', String(workerPort))} -- still starting up; check ${styleText('bold', 'claude-mem status')} later, or start manually: ${styleText('bold', 'npx claude-mem start')}`;
+    : `${styleText('yellow', '!')} Worker not yet ready on port ${styleText('cyan', String(workerPort))} -- still starting up; check ${styleText('bold', 'llm-mem status')} later, or start manually: ${styleText('bold', 'npx llm-mem start')}`;
   const firstSuccessOpener = autoStartSkipped
     ? `once the worker is running, keep ${styleText('underline', configuredWorkerBaseUrl)} open in a browser`
     : workerAlive
@@ -1864,18 +1864,18 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
     // the product is installed and working, never as a gate in front of it.
     await promptTelemetryOptIn();
     if (failedIDEs.length > 0) {
-      p.outro(styleText('yellow', 'claude-mem installed with some IDE setup failures.'));
+      p.outro(styleText('yellow', 'llm-mem installed with some IDE setup failures.'));
     } else {
-      p.outro(styleText('green', 'claude-mem installed successfully!'));
+      p.outro(styleText('green', 'llm-mem installed successfully!'));
     }
   } else {
     console.log('\n  Next Steps');
     nextSteps.forEach(l => console.log(`  ${l}`));
     if (failedIDEs.length > 0) {
-      console.log('\nclaude-mem installed with some IDE setup failures.');
+      console.log('\nllm-mem installed with some IDE setup failures.');
       process.exitCode = 1;
     } else {
-      console.log('\nclaude-mem installed successfully!');
+      console.log('\nllm-mem installed successfully!');
     }
   }
 
@@ -1905,9 +1905,9 @@ async function runRepairCommandInner(summary: InstallSummary): Promise<void> {
   let uvVersion = 'unknown';
 
   if (isInteractive) {
-    p.intro(styleText(['bgCyan', 'black'], ' claude-mem repair '));
+    p.intro(styleText(['bgCyan', 'black'], ' llm-mem repair '));
   } else {
-    console.log('claude-mem repair');
+    console.log('llm-mem repair');
   }
   log.info(`Version: ${styleText('cyan', version)}`);
 
@@ -1956,9 +1956,9 @@ async function runRepairCommandInner(summary: InstallSummary): Promise<void> {
   flushSummary(summary, (line) => (isInteractive ? p.log.message(line) : console.log(`  ${line}`)));
 
   if (isInteractive) {
-    p.outro(styleText('green', 'claude-mem repair complete.'));
+    p.outro(styleText('green', 'llm-mem repair complete.'));
   } else {
-    console.log('claude-mem repair complete.');
+    console.log('llm-mem repair complete.');
   }
 }
 
@@ -1974,7 +1974,7 @@ export async function runRepairCommand(): Promise<void> {
       if (isInteractive) {
         p.log.error(headline);
         p.log.error(err.remediation);
-        p.outro(styleText('red', 'claude-mem repair aborted.'));
+        p.outro(styleText('red', 'llm-mem repair aborted.'));
       } else {
         console.error(`\n  ${headline}`);
         console.error(`  ${err.remediation}`);

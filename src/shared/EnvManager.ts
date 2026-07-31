@@ -79,9 +79,9 @@ function parseEnvFile(content: string): Record<string, string> {
 
 function serializeEnvFile(env: Record<string, string>): string {
   const lines: string[] = [
-    '# claude-mem credentials',
-    '# This file stores keys and gateway settings for the claude-mem memory agent',
-    '# Edit this file or use claude-mem settings to configure',
+    '# llm-mem credentials',
+    '# This file stores keys and gateway settings for the llm-mem memory agent',
+    '# Edit this file or use llm-mem settings to configure',
     '',
   ];
 

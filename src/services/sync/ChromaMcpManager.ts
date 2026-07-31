@@ -18,7 +18,7 @@ import { ChromaUnavailableError } from '../worker/search/errors.js';
 
 const execFileAsync = promisify(execFile);
 
-const CHROMA_MCP_CLIENT_NAME = 'claude-mem-chroma';
+const CHROMA_MCP_CLIENT_NAME = 'llm-mem-chroma';
 const CHROMA_MCP_CLIENT_VERSION = '1.0.0';
 const MCP_CONNECTION_TIMEOUT_MS = 30_000;
 const DEFAULT_CHROMA_PREWARM_TIMEOUT_MS = 120_000;
@@ -801,7 +801,7 @@ export class ChromaMcpManager {
       const rawMessage = error instanceof Error ? error.message : String(error);
       const isMissingOrEmpty = /not exist|missing|empty|no such/i.test(rawMessage);
       const errorMessage = isMissingOrEmpty
-        ? `collection cm__claude-mem missing or empty (${rawMessage})`
+        ? `collection cm__llm-mem missing or empty (${rawMessage})`
         : rawMessage;
       logger.warn('CHROMA_MCP', 'Deep probe failed at query stage', {
         error: rawMessage,

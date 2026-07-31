@@ -203,12 +203,12 @@ Hooks installed to: ${targetDir}/hooks.json
 Using unified CLI: bun worker-service.cjs hook cursor <command>
 
 Next steps:
-  1. Start claude-mem worker: claude-mem start
+  1. Start llm-mem worker: llm-mem start
   2. Restart Cursor to load the hooks
   3. Check Cursor Settings → Hooks tab to verify
 
 Context Injection:
-  Context from past sessions is stored in .cursor/rules/claude-mem-context.mdc
+  Context from past sessions is stored in .cursor/rules/llm-mem-context.mdc
   and automatically included in every chat. It updates after each session ends.
 `);
 }
@@ -233,7 +233,7 @@ async function setupProjectContext(targetDir: string, workspaceRoot: string): Pr
   }
 
   if (!contextGenerated) {
-    const rulesFile = path.join(rulesDir, 'claude-mem-context.mdc');
+    const rulesFile = path.join(rulesDir, 'llm-mem-context.mdc');
     const placeholderContent = `---
 alwaysApply: true
 description: "Claude-mem context from past sessions (auto-updated)"
@@ -324,7 +324,7 @@ function removeCursorHooksFiles(
   }
 
   if (target === 'project') {
-    const contextFile = path.join(targetDir, 'rules', 'claude-mem-context.mdc');
+    const contextFile = path.join(targetDir, 'rules', 'llm-mem-context.mdc');
     if (existsSync(contextFile)) {
       unlinkSync(contextFile);
       console.log(`  Removed context file`);
@@ -404,7 +404,7 @@ export function checkCursorHooksStatus(): number {
       }
 
       if (loc.name === 'Project') {
-        const contextFile = path.join(loc.dir, 'rules', 'claude-mem-context.mdc');
+        const contextFile = path.join(loc.dir, 'rules', 'llm-mem-context.mdc');
         if (existsSync(contextFile)) {
           console.log(`   Context: Active`);
         } else {
@@ -418,7 +418,7 @@ export function checkCursorHooksStatus(): number {
   }
 
   if (!anyInstalled) {
-    console.log('No hooks installed. Run: claude-mem cursor install\n');
+    console.log('No hooks installed. Run: llm-mem cursor install\n');
   }
 
   return 0;
@@ -449,7 +449,7 @@ export async function handleCursorCommand(subcommand: string, args: string[]): P
       console.log(`
 Claude-Mem Cursor Integration
 
-Usage: claude-mem cursor <command> [options]
+Usage: llm-mem cursor <command> [options]
 
 Commands:
   setup               Interactive guided setup (recommended for first-time users)
@@ -465,9 +465,9 @@ Commands:
 Examples:
   npm run cursor:setup                   # Interactive wizard (recommended)
   npm run cursor:install                 # Install for current project
-  claude-mem cursor install user         # Install globally for user
-  claude-mem cursor uninstall            # Remove from current project
-  claude-mem cursor status               # Check if hooks are installed
+  llm-mem cursor install user         # Install globally for user
+  llm-mem cursor uninstall            # Remove from current project
+  llm-mem cursor status               # Check if hooks are installed
 
 For more info: https://docs.llm-mem.ai/cursor
       `);

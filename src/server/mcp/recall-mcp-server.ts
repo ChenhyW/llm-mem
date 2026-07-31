@@ -40,7 +40,7 @@ const TOOLS: Tool[] = [
   {
     name: 'search',
     description:
-      'Full-text search your claude-mem memory for a project. Returns matching observations (most relevant first).',
+      'Full-text search your llm-mem memory for a project. Returns matching observations (most relevant first).',
     inputSchema: {
       type: 'object',
       properties: {

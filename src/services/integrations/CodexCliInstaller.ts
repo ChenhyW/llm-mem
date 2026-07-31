@@ -15,9 +15,9 @@ const CODEX_DIR = path.join(homedir(), '.codex');
 const CODEX_AGENTS_MD_PATH = path.join(CODEX_DIR, 'AGENTS.md');
 const CODEX_TRANSCRIPT_WATCH_CONFIG_PATH = paths.transcriptsConfig();
 const CODEX_CONFIG_PATH = path.join(CODEX_DIR, 'config.toml');
-const MARKETPLACE_NAME = 'claude-mem-local';
-const CODEX_PLUGIN_ID = `claude-mem@${MARKETPLACE_NAME}`;
-const LEGACY_CODEX_PLUGIN_IDS = ['claude-mem@thedotmack'];
+const MARKETPLACE_NAME = 'llm-mem-local';
+const CODEX_PLUGIN_ID = `llm-mem@${MARKETPLACE_NAME}`;
+const LEGACY_CODEX_PLUGIN_IDS = ['llm-mem@thedotmack'];
 const MIN_CODEX_MARKETPLACE_VERSION = '0.128.0';
 const REQUIRED_MARKETPLACE_FILES = [
   path.join('.agents', 'plugins', 'marketplace.json'),
@@ -84,7 +84,7 @@ function resolvePluginMarketplaceRoot(preferredRoot?: string): string {
     if (resolved && missingMarketplaceFiles(resolved).length === 0) return resolved;
   }
 
-  throw new Error('Could not locate a Codex marketplace root with .agents/plugins/marketplace.json and plugin/.codex-plugin/plugin.json. Run npx claude-mem@latest install from the package or repo root.');
+  throw new Error('Could not locate a Codex marketplace root with .agents/plugins/marketplace.json and plugin/.codex-plugin/plugin.json. Run npx llm-mem@latest install from the package or repo root.');
 }
 
 function lookupCodexOnWindows(): string | null {
@@ -265,7 +265,7 @@ export function removeLegacyCodexMcpSearchConfig(content: string): string {
   const kept = blocks.filter((block) =>
     !isLegacyMcpSearchHeader(block.header) && !isLegacyMcpSearchChildHeader(block.header)
   );
-  // The stale claude-mem-owned server can have tool child tables; remove the
+  // The stale llm-mem-owned server can have tool child tables; remove the
   // whole subtree so Codex falls back to the plugin-managed MCP declaration.
   return kept.map((block) => block.text).join('\n').replace(/^\n+/, '').replace(/\n{3,}/g, '\n\n');
 }
@@ -323,15 +323,15 @@ function assertCodexMarketplaceSupported(): void {
   }
 
   if (version.localeCompare(MIN_CODEX_MARKETPLACE_VERSION, undefined, { numeric: true }) < 0) {
-    throw new Error(`Codex CLI ${version} is too old for plugin marketplace support. Update Codex CLI to ${MIN_CODEX_MARKETPLACE_VERSION} or newer, then run: npx claude-mem@latest install`);
+    throw new Error(`Codex CLI ${version} is too old for plugin marketplace support. Update Codex CLI to ${MIN_CODEX_MARKETPLACE_VERSION} or newer, then run: npx llm-mem@latest install`);
   }
 }
 
 function removeCodexAgentsMdContext(): boolean {
   if (!existsSync(CODEX_AGENTS_MD_PATH)) return true;
 
-  const startTag = '<claude-mem-context>';
-  const endTag = '</claude-mem-context>';
+  const startTag = '<llm-mem-context>';
+  const endTag = '</llm-mem-context>';
 
   try {
     readAndStripContextTags(startTag, endTag);
@@ -435,7 +435,7 @@ export async function installCodexCli(marketplaceRootOverride?: string): Promise
 
   if (!commandExists('codex')) {
     console.error('Codex CLI was not found on PATH.');
-    console.error('Install Codex, then run: npx claude-mem@latest install');
+    console.error('Install Codex, then run: npx llm-mem@latest install');
     return 1;
   }
 
@@ -475,7 +475,7 @@ Next steps:
   2. Restart any running Codex sessions so native hooks are loaded
 
 For a fresh setup, the supported entry point is:
-  npx claude-mem@latest install
+  npx llm-mem@latest install
 `);
   return 0;
 }

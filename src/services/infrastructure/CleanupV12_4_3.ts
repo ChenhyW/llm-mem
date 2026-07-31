@@ -42,7 +42,7 @@ export function runOneTimeV12_4_3Cleanup(
     return;
   }
 
-  const dbPath = path.join(effectiveDataDir, 'claude-mem.db');
+  const dbPath = path.join(effectiveDataDir, 'llm-mem.db');
   if (!existsSync(dbPath)) {
     if (dryRun) {
       logger.info('SYSTEM', 'v12.4.3 cleanup --dry-run: no DB present, nothing to scan', { dbPath });
@@ -169,7 +169,7 @@ function executeCleanup(dbPath: string, effectiveDataDir: string, markerPath: st
   const effectiveBackupsDir = path.join(effectiveDataDir, 'backups');
   mkdirSync(effectiveBackupsDir, { recursive: true });
   const ts = new Date().toISOString().replace(/[:.]/g, '-');
-  backupPath = path.join(effectiveBackupsDir, `claude-mem-pre-12.4.3-${ts}.db`);
+  backupPath = path.join(effectiveBackupsDir, `llm-mem-pre-12.4.3-${ts}.db`);
 
   const backupDb = new Database(dbPath, { readonly: true });
   let vacuumFailed = false;

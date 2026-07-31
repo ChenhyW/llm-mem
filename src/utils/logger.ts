@@ -99,7 +99,7 @@ class Logger {
       }
 
       const date = new Date().toISOString().split('T')[0];
-      this.logFilePath = join(logsDir, `claude-mem-${date}.log`);
+      this.logFilePath = join(logsDir, `llm-mem-${date}.log`);
     } catch (error: unknown) {
       console.error('[LOGGER] Failed to initialize log file:', error instanceof Error ? error.message : String(error));
       this.logFilePath = null;

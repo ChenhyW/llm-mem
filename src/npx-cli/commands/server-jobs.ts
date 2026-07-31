@@ -3,7 +3,7 @@
 import { parseArgs as parseNodeArgs, styleText } from 'node:util';
 import { logger } from '../../utils/logger.js';
 
-// Phase 12 — `claude-mem server jobs <subcommand>` operator console for the
+// Phase 12 — `llm-mem server jobs <subcommand>` operator console for the
 // Postgres-backed observation generation queue. These commands talk DIRECTLY
 // to Postgres (and BullMQ when configured), bypassing the HTTP API. They MUST
 // run from a host that can reach the same database the server runtime
@@ -76,7 +76,7 @@ export async function runServerJobsCommand(argv: string[]): Promise<void> {
 }
 
 function printJobsUsage(): void {
-  console.error(`Usage: ${styleText('bold', 'npx claude-mem server jobs <subcommand>')}`);
+  console.error(`Usage: ${styleText('bold', 'npx llm-mem server jobs <subcommand>')}`);
   console.error('Subcommands:');
   console.error('  status                    Show queue lane counts (Postgres + BullMQ)');
   console.error('  failed [--limit N]        List failed generation jobs (default 20)');

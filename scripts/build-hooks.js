@@ -68,11 +68,11 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
   ];
   const claudeHook = (tail, extra = {}) => buildShellCommand({
     host: 'claude-code', requireFile: 'bun-runner.js', requireFileSecondary: 'worker-service.cjs',
-    trailingCommand: ccTrailing(...tail), notFoundMessage: 'claude-mem: plugin scripts not found', ...extra,
+    trailingCommand: ccTrailing(...tail), notFoundMessage: 'llm-mem: plugin scripts not found', ...extra,
   });
   const codexHook = (tail) => buildShellCommand({
     host: 'codex-cli', requireFile: 'bun-runner.js', requireFileSecondary: 'worker-service.cjs',
-    trailingCommand: ccTrailing(...tail), notFoundMessage: 'claude-mem: plugin scripts not found',
+    trailingCommand: ccTrailing(...tail), notFoundMessage: 'llm-mem: plugin scripts not found',
     extraEnv: { LLM_MEM_CODEX_HOOK: '1' },
   });
   const codexStartupHook = () => buildShellCommand({
@@ -83,7 +83,7 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
       'LLM_MEM_CODEX_HOOK=1', ...ccTrailing('hook', 'codex', 'context'),
       '; fi',
     ],
-    notFoundMessage: 'claude-mem: plugin scripts not found',
+    notFoundMessage: 'llm-mem: plugin scripts not found',
   });
   const codexHookPair = (tail, options = {}) => ({
     command: options.startupVersionCheck ? codexStartupHook() : codexHook(tail),
@@ -97,7 +97,7 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
         'Setup.0.0': buildShellCommand({
           host: 'claude-code-setup', requireFile: 'version-check.js',
           trailingCommand: ['node', '"$_P/scripts/version-check.js"'],
-          notFoundMessage: 'claude-mem: version-check.js not found',
+          notFoundMessage: 'llm-mem: version-check.js not found',
         }),
         // `start` already emits its own single, valid status JSON via
         // buildStatusOutput ({"continue":true,"status":"ready","suppressOutput":true}).
@@ -129,7 +129,7 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
         // The mcp Node launcher derives its spawn target from requireFile, so
         // no trailingCommand is needed (it is ignored for this host).
         host: 'mcp', requireFile: 'mcp-server.cjs',
-        notFoundMessage: 'claude-mem: mcp server not found',
+        notFoundMessage: 'llm-mem: mcp server not found',
         mcpExtraCandidates: ['$PWD/plugin', '$PWD'],
         mcpExtraCacheRoots: [
           '$HOME/.codex/plugins/cache/llm-mem-local/llm-mem',
@@ -246,7 +246,7 @@ async function verifyShellTemplateCanonical() {
 }
 
 async function buildHooks() {
-  console.log('🔨 Building claude-mem hooks and worker service...\n');
+  console.log('🔨 Building llm-mem hooks and worker service...\n');
 
   try {
     const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
@@ -270,7 +270,7 @@ async function buildHooks() {
       name: 'llm-mem-plugin',
       version: version,
       private: true,
-      description: 'Runtime dependencies for claude-mem bundled hooks',
+      description: 'Runtime dependencies for llm-mem bundled hooks',
       type: 'module',
       dependencies: {
         'zod': '^4.4.3',

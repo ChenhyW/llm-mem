@@ -7,7 +7,7 @@ import { getMcpServerAbsolutePath, getNodeAbsolutePath } from './install-paths.j
 import { readJsonSafe } from '../../utils/json-utils.js';
 import { injectContextIntoMarkdownFile } from '../../utils/context-injection.js';
 
-export const PLACEHOLDER_CONTEXT = `# claude-mem: Cross-Session Memory
+export const PLACEHOLDER_CONTEXT = `# llm-mem: Cross-Session Memory
 
 *No context yet. Complete your first session and context will appear here.*
 
@@ -107,7 +107,7 @@ function writeMcpConfigAndContext(
   }
   summaryLines.push('');
   summaryLines.push('Next steps:');
-  summaryLines.push('  1. Start claude-mem worker: npx claude-mem start');
+  summaryLines.push('  1. Start llm-mem worker: npx llm-mem start');
   summaryLines.push(`  2. Restart ${config.ideLabel} to pick up the MCP server`);
   summaryLines.push('');
   console.log(summaryLines.join('\n'));
@@ -126,7 +126,7 @@ const ROO_CODE_CONFIG: McpInstallerConfig = {
   ideLabel: 'Roo Code',
   configPath: path.join(process.cwd(), '.roo', 'mcp.json'),
   configKey: 'mcpServers',
-  contextPath: path.join(process.cwd(), '.roo', 'rules', 'claude-mem-context.md'),
+  contextPath: path.join(process.cwd(), '.roo', 'rules', 'llm-mem-context.md'),
 };
 
 const WARP_CONFIG: McpInstallerConfig = {
@@ -142,14 +142,14 @@ function getGooseConfigPath(): string {
 }
 
 function gooseConfigHasClaudeMemEntry(yamlContent: string): boolean {
-  return yamlContent.includes('claude-mem:') &&
+  return yamlContent.includes('llm-mem:') &&
     yamlContent.includes('mcpServers:');
 }
 
 function buildGooseClaudeMemEntryYaml(mcpServerPath: string, withHeader = false): string {
   return [
     ...(withHeader ? ['mcpServers:'] : []),
-    '  claude-mem:',
+    '  llm-mem:',
     `    command: ${getNodeAbsolutePath()}`,
     '    args:',
     `      - ${mcpServerPath}`,
@@ -185,15 +185,15 @@ function mergeGooseYamlConfig(configPath: string, mcpServerPath: string): void {
     let yamlContent = readFileSync(configPath, 'utf-8');
 
     if (gooseConfigHasClaudeMemEntry(yamlContent)) {
-      const claudeMemPattern = /( {2}claude-mem:\n(?:.*\n)*?(?= {2}\S|\n\n|^\S|$))/m;
+      const claudeMemPattern = /( {2}llm-mem:\n(?:.*\n)*?(?= {2}\S|\n\n|^\S|$))/m;
       const newEntry = buildGooseClaudeMemEntryYaml(mcpServerPath) + '\n';
 
       if (!claudeMemPattern.test(yamlContent)) {
-        throw new Error('Found mcpServers/claude-mem markers but could not locate a replaceable claude-mem block');
+        throw new Error('Found mcpServers/llm-mem markers but could not locate a replaceable llm-mem block');
       }
       yamlContent = yamlContent.replace(claudeMemPattern, newEntry);
       writeFileSync(configPath, yamlContent);
-      console.log(`  Updated existing claude-mem entry in: ${configPath}`);
+      console.log(`  Updated existing llm-mem entry in: ${configPath}`);
     } else if (yamlContent.includes('mcpServers:')) {
       const mcpServersIndex = yamlContent.indexOf('mcpServers:');
       const insertionPoint = mcpServersIndex + 'mcpServers:'.length;
@@ -205,7 +205,7 @@ function mergeGooseYamlConfig(configPath: string, mcpServerPath: string): void {
         yamlContent.slice(insertionPoint);
 
       writeFileSync(configPath, yamlContent);
-      console.log(`  Added claude-mem to existing mcpServers in: ${configPath}`);
+      console.log(`  Added llm-mem to existing mcpServers in: ${configPath}`);
     } else {
       const mcpBlock = '\n' + buildGooseClaudeMemEntryYaml(mcpServerPath, true) + '\n';
       yamlContent = yamlContent.trimEnd() + '\n' + mcpBlock;
@@ -227,7 +227,7 @@ Note: This is an MCP-only integration providing search tools and context.
 Transcript capture is not available for Goose.
 
 Next steps:
-  1. Start claude-mem worker: npx claude-mem start
+  1. Start llm-mem worker: npx llm-mem start
   2. Restart Goose to pick up the MCP server
 `);
 }

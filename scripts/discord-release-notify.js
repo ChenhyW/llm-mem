@@ -57,7 +57,7 @@ async function postToDiscord(webhookUrl, version, notes) {
   const payload = {
     embeds: [
       {
-        title: `🚀 claude-mem ${version} released`,
+        title: `🚀 llm-mem ${version} released`,
         url: `${repoUrl}/releases/tag/${version}`,
         description: truncate(cleanedNotes, 2000),
         color: 0x7c3aed, // Purple
@@ -74,7 +74,7 @@ async function postToDiscord(webhookUrl, version, notes) {
           },
         ],
         footer: {
-          text: 'claude-mem • Persistent memory for Claude Code',
+          text: 'llm-mem • Persistent memory for Claude Code',
         },
         timestamp: new Date().toISOString(),
       },

@@ -4,7 +4,7 @@
  * Used by SDKAgent and KnowledgeAgent to locate a working Claude Code CLI.
  *
  * Every candidate is probed with the CAPABILITY PROBE — `--permission-mode
- * dontAsk --version` — not just `--version`. claude-mem passes
+ * dontAsk --version` — not just `--version`. llm-mem passes
  * `--permission-mode dontAsk` on every Observer/KnowledgeAgent spawn (see
  * buildHardenedSdkOptions in src/sdk/hardened-options.ts), and CLIs older than
  * the 2.1.x line reject it with "argument 'dontAsk' is invalid" and exit 1
@@ -109,7 +109,7 @@ function looksLikeDesktopAppPath(candidatePath: string): boolean {
 }
 
 type ProbeResult =
-  /** Runs and accepts every flag claude-mem passes. */
+  /** Runs and accepts every flag llm-mem passes. */
   | { kind: 'capable'; version: string }
   /** Runs (`--version` works) but rejects the capability flags — too old. */
   | { kind: 'incompatible'; version: string; detail: string }
@@ -272,7 +272,7 @@ function updateInstructions(): string {
  *      capability; the newest capable version is returned
  *
  * @param logComponent  Logger {@link Component} tag (e.g. 'SDK', 'WORKER')
- * @throws {Error} when no Claude CLI compatible with claude-mem can be found
+ * @throws {Error} when no Claude CLI compatible with llm-mem can be found
  */
 export function findClaudeExecutable(logComponent: Component = 'SDK'): string {
   if (cachedResolution && cachedResolution.expiresAtMs > Date.now() && _internals.existsSync(cachedResolution.path)) {
@@ -309,7 +309,7 @@ export function findClaudeExecutable(logComponent: Component = 'SDK'): string {
     }
     if (probe.kind === 'incompatible') {
       throw new Error(
-        `CLAUDE_CODE_PATH is set to "${settings.CLAUDE_CODE_PATH}" (${probe.version}) but that CLI is too old for claude-mem — ` +
+        `CLAUDE_CODE_PATH is set to "${settings.CLAUDE_CODE_PATH}" (${probe.version}) but that CLI is too old for llm-mem — ` +
         `it rejects flags every memory agent spawn requires (${probe.detail}). ${updateInstructions()}`
       );
     }
@@ -343,7 +343,7 @@ export function findClaudeExecutable(logComponent: Component = 'SDK'): string {
       incompatible.push({ path: candidate, version: probe.version, detail: probe.detail });
       logger.warn(
         logComponent,
-        `Skipping "${candidate}" (${probe.version}) — too old for claude-mem: ${probe.detail}`
+        `Skipping "${candidate}" (${probe.version}) — too old for llm-mem: ${probe.detail}`
       );
       continue;
     }
@@ -381,7 +381,7 @@ export function findClaudeExecutable(logComponent: Component = 'SDK'): string {
       .map((entry) => `  - ${entry.path} (${entry.version}) — ${entry.detail}`)
       .join('\n');
     throw new Error(
-      `Every Claude CLI found is too old for claude-mem (each rejects flags the memory agent passes on every spawn):\n` +
+      `Every Claude CLI found is too old for llm-mem (each rejects flags the memory agent passes on every spawn):\n` +
       `${lines}\n${updateInstructions()}`
     );
   }

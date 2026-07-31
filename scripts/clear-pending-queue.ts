@@ -10,7 +10,7 @@ interface StatusRow { status: string; count: number }
 
 function resolveDbPath(): string {
   const dataDir = process.env.LLM_MEM_DATA_DIR || join(homedir(), '.llm-mem');
-  return join(dataDir, 'claude-mem.db');
+  return join(dataDir, 'llm-mem.db');
 }
 
 async function prompt(question: string): Promise<string> {
@@ -54,7 +54,7 @@ Examples:
   bun scripts/clear-pending-queue.ts --all --force
 
 Notes:
-  Operates directly on ~/.llm-mem/claude-mem.db (or \$LLM_MEM_DATA_DIR).
+  Operates directly on ~/.llm-mem/llm-mem.db (or \$LLM_MEM_DATA_DIR).
   Uses SQLite WAL mode so it is safe to run while the worker is running.
 `);
     process.exit(0);

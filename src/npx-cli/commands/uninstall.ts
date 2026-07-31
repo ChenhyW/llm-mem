@@ -92,8 +92,8 @@ function removeFromKnownMarketplaces(): void {
 
 function removeFromInstalledPlugins(): void {
   const installedPlugins = readJsonSafe<Record<string, any>>(installedPluginsPath(), {});
-  if (installedPlugins.plugins?.['claude-mem@thedotmack']) {
-    delete installedPlugins.plugins['claude-mem@thedotmack'];
+  if (installedPlugins.plugins?.['llm-mem@thedotmack']) {
+    delete installedPlugins.plugins['llm-mem@thedotmack'];
     writeJsonFileAtomic(installedPluginsPath(), installedPlugins);
   }
 }
@@ -106,7 +106,7 @@ function stripLegacyClaudeMemAlias(): void {
     join(home, 'Documents', 'PowerShell', 'Microsoft.PowerShell_profile.ps1'),
   ];
 
-  const aliasLineRegex = /^\s*alias\s+claude-mem\s*=/;
+  const aliasLineRegex = /^\s*alias\s+llm-mem\s*=/;
 
   for (const filePath of candidateFiles) {
     if (!existsSync(filePath)) continue;
@@ -122,7 +122,7 @@ function stripLegacyClaudeMemAlias(): void {
     if (filtered.length === lines.length) continue; 
     try {
       writeFileSync(filePath, filtered.join('\n'));
-      console.error(`Removed legacy claude-mem alias from ${filePath}`);
+      console.error(`Removed legacy llm-mem alias from ${filePath}`);
     } catch (error: unknown) {
       console.warn(`[uninstall] Could not rewrite ${filePath}:`, error instanceof Error ? error.message : String(error));
     }
@@ -133,8 +133,8 @@ export function removeFromClaudeSettings(): void {
   const settings = readJsonSafe<Record<string, any>>(claudeSettingsPath(), {});
   let dirty = false;
 
-  if (settings.enabledPlugins?.['claude-mem@thedotmack'] !== undefined) {
-    delete settings.enabledPlugins['claude-mem@thedotmack'];
+  if (settings.enabledPlugins?.['llm-mem@thedotmack'] !== undefined) {
+    delete settings.enabledPlugins['llm-mem@thedotmack'];
     dirty = true;
   }
 
@@ -144,9 +144,9 @@ export function removeFromClaudeSettings(): void {
   // CLI's default behavior by removing that key. The value-equality guard
   // (=== '1') ensures we only strip the specific token the installer wrote
   // — if a user had pre-set this key to something else (e.g. '0' to force
-  // auto-memory on), or to '1' themselves before installing claude-mem,
+  // auto-memory on), or to '1' themselves before installing llm-mem,
   // their intent is preserved. The installer's own no-op-when-already-'1'
-  // path means the worst case is leaving behind a value claude-mem would
+  // path means the worst case is leaving behind a value llm-mem would
   // have written anyway. Any other env entries the user added themselves
   // (ANTHROPIC_AUTH_TOKEN, AWS_REGION, etc.) are preserved. If the env
   // block becomes empty as a result, the block itself is dropped to keep
@@ -211,7 +211,7 @@ function removeStrayClaudeMemPaths(): number {
         continue;
       }
       for (const entry of logEntries) {
-        if (!entry.startsWith('mcp-logs-plugin-claude-mem-')) continue;
+        if (!entry.startsWith('mcp-logs-plugin-llm-mem-')) continue;
         const logPath = join(projectPath, entry);
         try {
           rmSync(logPath, { recursive: true, force: true });
@@ -223,7 +223,7 @@ function removeStrayClaudeMemPaths(): number {
     }
   }
 
-  const pluginDataDir = join(home, '.claude', 'plugins', 'data', 'claude-mem-thedotmack');
+  const pluginDataDir = join(home, '.claude', 'plugins', 'data', 'llm-mem-thedotmack');
   if (existsSync(pluginDataDir)) {
     try {
       rmSync(pluginDataDir, { recursive: true, force: true });
@@ -237,10 +237,10 @@ function removeStrayClaudeMemPaths(): number {
 }
 
 export async function runUninstallCommand(): Promise<void> {
-  p.intro(styleText(['bgRed', 'white'], ' claude-mem uninstall '));
+  p.intro(styleText(['bgRed', 'white'], ' llm-mem uninstall '));
 
   if (!isPluginInstalled()) {
-    p.log.warn('claude-mem does not appear to be installed.');
+    p.log.warn('llm-mem does not appear to be installed.');
 
     if (process.stdin.isTTY) {
       const shouldCleanup = await p.confirm({
@@ -258,7 +258,7 @@ export async function runUninstallCommand(): Promise<void> {
     }
   } else if (process.stdin.isTTY) {
     const shouldContinue = await p.confirm({
-      message: 'Are you sure you want to uninstall claude-mem?',
+      message: 'Are you sure you want to uninstall llm-mem?',
       initialValue: false,
     });
 
@@ -338,14 +338,14 @@ export async function runUninstallCommand(): Promise<void> {
       },
     },
     {
-      title: 'Removing legacy claude-mem shell alias',
+      title: 'Removing legacy llm-mem shell alias',
       task: async () => {
         stripLegacyClaudeMemAlias();
         return `Legacy alias check complete ${styleText('green', 'OK')}`;
       },
     },
     {
-      title: 'Removing stray claude-mem caches and logs',
+      title: 'Removing stray llm-mem caches and logs',
       task: async () => {
         const removed = removeStrayClaudeMemPaths();
         return removed > 0
@@ -401,5 +401,5 @@ export async function runUninstallCommand(): Promise<void> {
   // install ID still live in ~/.llm-mem, which uninstall preserves.
   await captureCliEvent('uninstall_completed', {}, { person: true });
 
-  p.outro(styleText('green', 'claude-mem has been uninstalled.'));
+  p.outro(styleText('green', 'llm-mem has been uninstalled.'));
 }

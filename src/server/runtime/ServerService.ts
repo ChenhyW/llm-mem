@@ -65,7 +65,7 @@ class ServerRuntimeInfoRoutes implements RouteHandler {
     app.get('/v1/info', async (_req, res) => {
       const queueLanes = await collectQueueLaneMetrics(this.graph);
       res.json({
-        name: 'claude-mem-server',
+        name: 'llm-mem-server',
         runtime: SERVER_RUNTIME,
         authMode: this.graph.authMode,
         postgres: {
@@ -288,7 +288,7 @@ export async function runServerServiceCli(argv: string[] = process.argv.slice(2)
   const port = getServerPort();
   const host = process.env.LLM_MEM_SERVER_HOST ?? DEFAULT_SERVER_HOST;
 
-  // Phase 10: `claude-mem server worker [start|--daemon]` runs the BullMQ
+  // Phase 10: `llm-mem server worker [start|--daemon]` runs the BullMQ
   // generation worker as a foregrounded process — no HTTP server, no route
   // registration. In Compose this becomes a separately scaled service.
   if (command === 'worker') {

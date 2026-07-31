@@ -20,7 +20,7 @@ const _dirname = getDirname();
  * Node's `path.join` / `fs` do NOT expand `~` — only the shell does. So a
  * literal `~/.llm-mem` read from `settings.json` or an env var is treated
  * as a *relative* path, creating a directory literally named `~` in the
- * process cwd. claude-mem workers inherit the cwd of whatever spawned them
+ * process cwd. llm-mem workers inherit the cwd of whatever spawned them
  * (subagents pinned to a subdirectory, a plugin-install dir, etc.), so a
  * `~`-prefixed DATA_DIR scattered stray `~/.llm-mem/` trees across the
  * workspace. Expanding here keeps every downstream path absolute regardless

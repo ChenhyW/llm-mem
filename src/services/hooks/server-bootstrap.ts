@@ -3,7 +3,7 @@
 // Phase 7 — Local API key bootstrap for the server runtime.
 //
 // When the operator selects `runtime: "server"` during install (or via
-// the `claude-mem server keys rotate` command), we provision a local hook
+// the `llm-mem server keys rotate` command), we provision a local hook
 // API key against the local Postgres so hooks can authenticate to /v1/*.
 //
 // Bootstrapping flow:

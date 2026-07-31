@@ -89,7 +89,7 @@ export function isErrorTelemetryEnabled(env: NodeJS.ProcessEnv): boolean {
   return true;
 }
 
-/** Absolute path of telemetry.json inside the claude-mem data dir. */
+/** Absolute path of telemetry.json inside the llm-mem data dir. */
 export function getTelemetryConfigPath(): string {
   return join(resolveDataDir(), TELEMETRY_CONFIG_FILENAME);
 }

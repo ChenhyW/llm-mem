@@ -49,7 +49,7 @@ function mcpConnectUrl(req: Request): string {
   return `${base}/v1/mcp`;
 }
 function mcpConnectCommand(mcpUrl: string, key: string): string {
-  return `claude mcp add --transport http claude-mem ${mcpUrl} --header "Authorization: Bearer ${key}"`;
+  return `claude mcp add --transport http llm-mem ${mcpUrl} --header "Authorization: Bearer ${key}"`;
 }
 
 export interface ServerV1PostgresRoutesOptions {
@@ -1002,7 +1002,7 @@ export class ServerV1PostgresRoutes implements RouteHandler {
 
     // Remote authenticated MCP endpoint. The "secure MCP link" a user pastes
     // into Claude Code (or any MCP client) to recall their cloud memory:
-    //   claude mcp add --transport http claude-mem <base>/v1/mcp \
+    //   claude mcp add --transport http llm-mem <base>/v1/mcp \
     //     --header "Authorization: Bearer cm_..."
     // Same readAuth (memories:read) + team/project scoping + audit trail as
     // /v1/search, so it reads identical data through identical guards. Stateless

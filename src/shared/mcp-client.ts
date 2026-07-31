@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.js';
 import { MARKETPLACE_ROOT } from './paths.js';
 import { sanitizeEnv } from '../supervisor/env-sanitizer.js';
 
-const MCP_CLIENT_NAME = 'claude-mem-hook';
+const MCP_CLIENT_NAME = 'llm-mem-hook';
 const MCP_CLIENT_VERSION = '1.0.0';
 const MCP_CALL_TIMEOUT_MS = 30_000;
 

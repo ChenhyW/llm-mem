@@ -55,8 +55,8 @@ function isValidPathForClaudeMd(filePath: string, projectRoot?: string): boolean
 }
 
 export function replaceTaggedContent(existingContent: string, newContent: string): string {
-  const startTag = '<claude-mem-context>';
-  const endTag = '</claude-mem-context>';
+  const startTag = '<llm-mem-context>';
+  const endTag = '</llm-mem-context>';
 
   if (!existingContent) {
     return `${startTag}\n${newContent}\n${endTag}`;

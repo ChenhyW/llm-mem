@@ -301,7 +301,7 @@ Plugin installed to: ${extensionDirectory}
 Config updated: ${getOpenClawConfigFilePath()}
 
 Next steps:
-  1. Start claude-mem worker: npx claude-mem start
+  1. Start llm-mem worker: npx llm-mem start
   2. Restart OpenClaw to load the plugin
   3. Memory capture is automatic from then on
 `);

@@ -114,7 +114,7 @@ export async function runWorkerDependencyPreflight(
         (options.platform === 'win32' ? 'python.exe' : 'python3');
       recordHnswVectorSearchUnavailable(
         `HNSW vector-search helper not available via ${pythonBin}; python3 -c "import hnswlib, numpy" failed. ` +
-          'Install the packages and restart claude-mem.',
+          'Install the packages and restart llm-mem.',
       );
     }
   } else {

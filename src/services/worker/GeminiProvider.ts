@@ -306,7 +306,7 @@ export class GeminiProvider extends OpenAICompatibleProvider<GeminiConfig> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(priorRequestId ? { 'x-claude-mem-prior-request-id': priorRequestId } : {}),
+        ...(priorRequestId ? { 'x-llm-mem-prior-request-id': priorRequestId } : {}),
       },
       body: JSON.stringify({
         contents,

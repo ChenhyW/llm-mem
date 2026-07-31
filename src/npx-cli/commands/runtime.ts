@@ -9,8 +9,8 @@ import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js
 
 function ensureInstalledOrExit(): void {
   if (!isPluginInstalled()) {
-    console.error(styleText('red', 'claude-mem is not installed.'));
-    console.error(`Run: ${styleText('bold', 'npx claude-mem install')}`);
+    console.error(styleText('red', 'llm-mem is not installed.'));
+    console.error(`Run: ${styleText('bold', 'npx llm-mem install')}`);
     process.exit(1);
   }
 }
@@ -72,7 +72,7 @@ function spawnBunWorkerCommand(command: string, extraArgs: string[] = []): void 
 
   if (!existsSync(workerScript)) {
     console.error(styleText('red', `Worker script not found at: ${workerScript}`));
-    console.error('The installation may be corrupted. Try: npx claude-mem install');
+    console.error('The installation may be corrupted. Try: npx llm-mem install');
     process.exit(1);
   }
 
@@ -86,7 +86,7 @@ function spawnBunServerCommand(command: string, extraArgs: string[] = []): void 
 
   if (!existsSync(serverScript)) {
     console.error(styleText('red', `Server script not found at: ${serverScript}`));
-    console.error('The installation may be corrupted. Try: npx claude-mem install');
+    console.error('The installation may be corrupted. Try: npx llm-mem install');
     process.exit(1);
   }
 
@@ -143,7 +143,7 @@ export function runAdoptCommand(extraArgs: string[] = []): void {
 
   if (!existsSync(workerScript)) {
     console.error(styleText('red', `Worker script not found at: ${workerScript}`));
-    console.error('The installation may be corrupted. Try: npx claude-mem install');
+    console.error('The installation may be corrupted. Try: npx llm-mem install');
     process.exit(1);
   }
 
@@ -160,7 +160,7 @@ export async function runSearchCommand(queryParts: string[]): Promise<void> {
 
   const query = queryParts.join(' ').trim();
   if (!query) {
-    console.error(styleText('red', 'Usage: npx claude-mem search <query>'));
+    console.error(styleText('red', 'Usage: npx llm-mem search <query>'));
     process.exit(1);
   }
 
@@ -176,7 +176,7 @@ export async function runSearchCommand(queryParts: string[]): Promise<void> {
     const cause = error instanceof Error ? (error as any).cause : undefined;
     if (cause?.code === 'ECONNREFUSED' || message.includes('ECONNREFUSED')) {
       console.error(styleText('red', 'Worker is not running.'));
-      console.error(`Start it with: ${styleText('bold', 'npx claude-mem start')}`);
+      console.error(`Start it with: ${styleText('bold', 'npx llm-mem start')}`);
       process.exit(1);
     }
     console.error(styleText('red', `Search failed: ${message}`));
@@ -186,7 +186,7 @@ export async function runSearchCommand(queryParts: string[]): Promise<void> {
   if (!response.ok) {
     if (response.status === 404) {
       console.error(styleText('red', 'Search endpoint not found. Is the worker running?'));
-      console.error(`Try: ${styleText('bold', 'npx claude-mem start')}`);
+      console.error(`Try: ${styleText('bold', 'npx llm-mem start')}`);
       process.exit(1);
     }
     console.error(styleText('red', `Search failed: HTTP ${response.status}`));

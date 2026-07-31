@@ -231,7 +231,7 @@ function checkPackageCompleteness(failures) {
   );
 
   // Build the candidate list of published entrypoints to load. Prefer the `bin`
-  // (the real, runnable user entry — `npx claude-mem`), which exposes a safe
+  // (the real, runnable user entry — `npx llm-mem`), which exposes a safe
   // `--version` flag that loads the whole CLI and exits 0. Then add any
   // `main`/`exports` targets THAT ACTUALLY EXIST in the tarball. The package
   // currently declares exports['.'] -> ./dist/index.js and exports['./sdk'] ->

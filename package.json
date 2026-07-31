@@ -1,7 +1,7 @@
 {
   "name": "llm-mem",
   "version": "1.0.0",
-  "description": "Memory compression system for Claude Code - persist context across sessions",
+  "description": "Memory compression system for IDEs (Claude/Codex/Cursor) - persist context across sessions",
   "keywords": [
     "claude",
     "claude-code",

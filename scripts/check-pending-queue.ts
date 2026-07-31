@@ -148,7 +148,7 @@ Examples:
   bun scripts/check-pending-queue.ts --process
 
 What is this for?
-  If the claude-mem worker has unprocessed observations queued, this script
+  If the llm-mem worker has unprocessed observations queued, this script
   reports the current queue depth and lets you trigger processing.
 `);
     process.exit(0);

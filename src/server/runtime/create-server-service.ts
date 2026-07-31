@@ -102,7 +102,7 @@ export function validateServerEnv(
   if (isDocker) {
     if (authMode === 'local-dev') {
       errors.push(
-        'LLM_MEM_AUTH_MODE=local-dev is not allowed in Docker. Set LLM_MEM_AUTH_MODE=api-key and create a key with `claude-mem server api-key create`.',
+        'LLM_MEM_AUTH_MODE=local-dev is not allowed in Docker. Set LLM_MEM_AUTH_MODE=api-key and create a key with `llm-mem server api-key create`.',
       );
     }
     if (
@@ -192,7 +192,7 @@ export async function createServerService(
   const generationWorkerManager = options.generationWorkerManager
     ?? (generationDisabled
       ? new DisabledServerGenerationWorkerManager(
-          'LLM_MEM_GENERATION_DISABLED is set; this server runs HTTP only. A separate `claude-mem server worker start` process consumes the BullMQ queues.',
+          'LLM_MEM_GENERATION_DISABLED is set; this server runs HTTP only. A separate `llm-mem server worker start` process consumes the BullMQ queues.',
         )
       : buildGenerationWorkerManager(pool, queueManager, options.generationProvider));
   const graph: ServerServiceGraph = {

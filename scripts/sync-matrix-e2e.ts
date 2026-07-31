@@ -397,8 +397,8 @@ function openDevice(
   existingDir?: string,
   options: { wsEnabled?: boolean; start?: boolean } = {},
 ): Device {
-  const dir = existingDir ?? mkdtempSync(join(tmpdir(), `claude-mem-matrix-${name}-`));
-  const dbPath = join(dir, 'claude-mem.db');
+  const dir = existingDir ?? mkdtempSync(join(tmpdir(), `llm-mem-matrix-${name}-`));
+  const dbPath = join(dir, 'llm-mem.db');
   const store = new SessionStore(dbPath);
   const gate: NetworkGate = { pushesOnline: true, pushAttempts: 0, pullRequests: 0 };
   const cloudSync = new CloudSync(store.db, {

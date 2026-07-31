@@ -208,7 +208,7 @@ export class OpenRouterProvider extends OpenAICompatibleProvider<OpenRouterConfi
         'HTTP-Referer': siteUrl || 'https://github.com/thedotmack/llm-mem',
         'X-Title': appName || 'llm-mem',
         'Content-Type': 'application/json',
-        ...(priorRequestId ? { 'x-claude-mem-prior-request-id': priorRequestId } : {}),
+        ...(priorRequestId ? { 'x-llm-mem-prior-request-id': priorRequestId } : {}),
       },
       body: JSON.stringify({
         model,

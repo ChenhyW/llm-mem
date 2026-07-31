@@ -44,7 +44,7 @@ function parseCliArgs(): CliArgs {
 
 function printHelp(): void {
   console.log(`
-bug-report - Generate bug reports for claude-mem
+bug-report - Generate bug reports for llm-mem
 
 USAGE:
   npm run bug-report [options]
@@ -57,7 +57,7 @@ OPTIONS:
 
 DESCRIPTION:
   This script collects system diagnostics, prompts you for issue details,
-  and generates a formatted GitHub issue for claude-mem using the Claude Agent SDK.
+  and generates a formatted GitHub issue for llm-mem using the Claude Agent SDK.
 
   The generated report will be saved to ~/bug-report-YYYY-MM-DD-HHMMSS.md
   and displayed in your terminal for easy copy-pasting to GitHub.
