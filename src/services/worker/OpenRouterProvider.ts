@@ -205,7 +205,7 @@ export class OpenRouterProvider extends OpenAICompatibleProvider<OpenRouterConfi
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': siteUrl || 'https://github.com/thedotmack/llm-mem',
+        'HTTP-Referer': siteUrl || 'https://github.com/ChenhyW/llm-mem',
         'X-Title': appName || 'llm-mem',
         'Content-Type': 'application/json',
         ...(priorRequestId ? { 'x-llm-mem-prior-request-id': priorRequestId } : {}),

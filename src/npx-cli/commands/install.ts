@@ -167,10 +167,10 @@ import { detectInstalledIDEs } from './ide-detection.js';
 function registerMarketplace(): void {
   const knownMarketplaces = readJsonSafe<Record<string, any>>(knownMarketplacesPath(), {});
 
-  knownMarketplaces['thedotmack'] = {
+  knownMarketplaces['ChenhyW'] = {
     source: {
       source: 'github',
-      repo: 'thedotmack/llm-mem',
+      repo: 'ChenhyW/llm-mem',
     },
     installLocation: marketplaceDirectory(),
     lastUpdated: new Date().toISOString(),
@@ -190,7 +190,7 @@ function registerPlugin(version: string): void {
   const cachePath = pluginCacheDirectory(version);
   const now = new Date().toISOString();
 
-  installedPlugins.plugins['llm-mem@thedotmack'] = [
+  installedPlugins.plugins['llm-mem@ChenhyW'] = [
     {
       scope: 'user',
       installPath: cachePath,
@@ -207,7 +207,7 @@ function enablePluginInClaudeSettings(): void {
   const settings = readJsonSafe<Record<string, any>>(claudeSettingsPath(), {});
 
   if (!settings.enabledPlugins) settings.enabledPlugins = {};
-  settings.enabledPlugins['llm-mem@thedotmack'] = true;
+  settings.enabledPlugins['llm-mem@ChenhyW'] = true;
 
   writeJsonFileAtomic(claudeSettingsPath(), settings);
 }

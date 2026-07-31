@@ -213,7 +213,7 @@ export async function collectDiagnostics(
     ".claude",
     "plugins",
     "marketplaces",
-    "thedotmack"
+    "ChenhyW"
   );
   const cwd = process.cwd();
   const isDevMode = cwd.includes("llm-mem") && !cwd.includes(".claude");

@@ -5,7 +5,7 @@ import { homedir } from 'os';
 import { logger } from '../utils/logger.js';
 import { parseJsonWithBom } from './atomic-json.js';
 
-const PLUGIN_SETTINGS_KEY = 'llm-mem@thedotmack';
+const PLUGIN_SETTINGS_KEY = 'llm-mem@ChenhyW';
 
 export function isPluginDisabledInClaudeSettings(): boolean {
   try {

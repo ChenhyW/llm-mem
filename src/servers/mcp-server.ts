@@ -987,13 +987,13 @@ process.on('SIGINT', cleanup);
 function detectMissingMarketplaceMarker(): void {
   const home = homedir();
   const marketplaceCandidates = [
-    resolve(home, '.claude', 'plugins', 'marketplaces', 'thedotmack'),
-    resolve(home, '.config', 'claude', 'plugins', 'marketplaces', 'thedotmack'),
+    resolve(home, '.claude', 'plugins', 'marketplaces', 'ChenhyW'),
+    resolve(home, '.config', 'claude', 'plugins', 'marketplaces', 'ChenhyW'),
   ];
   const present = marketplaceCandidates.some(p => p && existsSync(p));
   const cacheCandidates = [
-    resolve(home, '.claude', 'plugins', 'cache', 'thedotmack', 'llm-mem'),
-    resolve(home, '.config', 'claude', 'plugins', 'cache', 'thedotmack', 'llm-mem'),
+    resolve(home, '.claude', 'plugins', 'cache', 'ChenhyW', 'llm-mem'),
+    resolve(home, '.config', 'claude', 'plugins', 'cache', 'ChenhyW', 'llm-mem'),
   ];
   const cachePresent = cacheCandidates.some(p => p && existsSync(p));
   const cacheRoot = cacheCandidates[0];
@@ -1001,7 +1001,7 @@ function detectMissingMarketplaceMarker(): void {
   if (!present && cachePresent) {
     logger.error(
       'SYSTEM',
-      'llm-mem MCP started but no marketplace directory was found at ~/.claude/plugins/marketplaces/thedotmack or the XDG equivalent. The IDE plugin loader needs that directory to fire llm-mem hooks (SessionStart, PostToolUse, Stop, etc.). Without it, MCP search will work but no new memories will be captured. To self-heal, run: node ~/.claude/plugins/cache/thedotmack/llm-mem/*/scripts/smart-install.js (or reinstall the plugin from the marketplace).',
+      'llm-mem MCP started but no marketplace directory was found at ~/.claude/plugins/marketplaces/ChenhyW or the XDG equivalent. The IDE plugin loader needs that directory to fire llm-mem hooks (SessionStart, PostToolUse, Stop, etc.). Without it, MCP search will work but no new memories will be captured. To self-heal, run: node ~/.claude/plugins/cache/ChenhyW/llm-mem/*/scripts/smart-install.js (or reinstall the plugin from the marketplace).',
       { marketplaceCandidates, cacheRoot }
     );
   }

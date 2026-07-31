@@ -52,7 +52,7 @@ function truncate(text, maxLength) {
 
 async function postToDiscord(webhookUrl, version, notes) {
   const cleanedNotes = notes ? cleanNotes(notes) : 'No release notes available.';
-  const repoUrl = 'https://github.com/thedotmack/llm-mem';
+  const repoUrl = 'https://github.com/ChenhyW/llm-mem';
 
   const payload = {
     embeds: [

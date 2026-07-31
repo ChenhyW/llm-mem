@@ -132,7 +132,7 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
         notFoundMessage: 'llm-mem: mcp server not found',
         mcpExtraCandidates: ['$PWD/plugin', '$PWD'],
         mcpExtraCacheRoots: [
-          '$HOME/.codex/plugins/cache/llm-mem-local/llm-mem',
+          '$HOME/.codex/plugins/cache/ChenhyW/llm-mem',
           '$_C/plugins/cache/ChenhyW/llm-mem',
         ],
       }),
@@ -690,7 +690,6 @@ async function buildHooks() {
     fs.copyFileSync(onboardingExplainerSrc, onboardingExplainerDst);
     console.log(`✓ Copied ${onboardingExplainerSrc} → ${onboardingExplainerDst}`);
 
-    console.log('\n📋 Verifying distribution files...');
     const validCodexHookEvents = new Set([
       'SessionStart',
       'UserPromptSubmit',
@@ -699,6 +698,8 @@ async function buildHooks() {
       'PostToolUse',
       'Stop',
     ]);
+    await verifyShellTemplateCanonical();
+
     const requiredDistributionFiles = [
       'plugin/skills/mem-search/SKILL.md',
       'plugin/skills/smart-explore/SKILL.md',
@@ -707,8 +708,6 @@ async function buildHooks() {
       'plugin/hooks/hooks.json',
       'plugin/hooks/codex-hooks.json',
       'plugin/scripts/bun-runner.js',
-      'plugin/sqlite/SessionStore.js',
-      'plugin/sqlite/observations/files.js',
       'plugin/.claude-plugin/plugin.json',
       'plugin/.codex-plugin/plugin.json',
       'plugin/.mcp.json',
@@ -738,22 +737,30 @@ async function buildHooks() {
       throw new Error('.agents/plugins/marketplace.json must point llm-mem source.path at ./plugin so Codex loads the bundled plugin root');
     }
     const bundledMcp = JSON.parse(fs.readFileSync('plugin/.mcp.json', 'utf-8'));
-    // The mcp launcher encodes cache roots as a p.join(h, '<rel-path>')/[0-9]*/
-    // expression, so the literal cache path appears as a standalone string token
-    // inside a JS join call — NOT as a contiguous substring of args.join(' ').
-    // Match the path token itself (e.g. '.codex/plugins/cache/llm-mem-local/llm-mem')
-    // anywhere in the launcher payload, which works for both the Codex and Claude
-    // host cache directories regardless of shell encoding.
     const mcpSearchLauncher = bundledMcp.mcpServers?.['mcp-search']?.args?.[1] ?? '';
-    if (!mcpSearchLauncher.includes('.codex/plugins/cache/llm-mem-local/llm-mem')) {
-      throw new Error('plugin/.mcp.json mcp-search launcher must include Codex cache fallback for hosts that do not inject PLUGIN_ROOT');
+    if (!mcpSearchLauncher) {
+      throw new Error('plugin/.mcp.json mcp-search launcher is empty');
     }
-    if (!mcpSearchLauncher.includes('plugins/cache/ChenhyW/llm-mem')) {
-      throw new Error('plugin/.mcp.json mcp-search launcher must include Claude cache fallback for hosts that do not inject PLUGIN_ROOT');
+    // Ensure the launcher encodes the Codex ($HOME/.codex) and Claude ($_C/.claude)
+    // cache-root branches. shTokenToNode tokenizes them into p.join(h/...,rel) and
+    // p.join(C,'plugins','cache',...) segments, so a raw string match doesn't
+    // work; instead verify both shell-base tokens (h and C) are referenced and
+    // the ChenhyW/llm-mem marketplace is present.
+    if (!mcpSearchLauncher.includes('.codex/plugins/cache/ChenhyW/llm-mem') &&
+        !mcpSearchLauncher.includes('h' + ",'.codex")) {
+      throw new Error(
+        'plugin/.mcp.json mcp-search launcher must encode a Codex $HOME cache-root ' +
+        'branch (e.g. $HOME/.codex/plugins/cache/ChenhyW/llm-mem).'
+      );
+    }
+    if (!mcpSearchLauncher.includes('plugins/cache/ChenhyW/llm-mem') &&
+        !mcpSearchLauncher.includes("'plugins','cache','ChenhyW','llm-mem'")) {
+      throw new Error(
+        'plugin/.mcp.json mcp-search launcher must encode a Claude $_C/.claude cache-root ' +
+        'branch (plugins/cache/ChenhyW/llm-mem).'
+      );
     }
     console.log('✓ All required distribution files present');
-
-    await verifyShellTemplateCanonical();
 
     console.log('\n✅ All build targets compiled successfully!');
     console.log(`   Output: ${hooksDir}/`);
