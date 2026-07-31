@@ -1,0 +1,17 @@
+{
+  "name": "ChenhyW",
+  "owner": {
+    "name": "ChenhyW"
+  },
+  "metadata": {
+    "description": "Plugins by ChenhyW"
+  },
+  "plugins": [
+    {
+      "name": "llm-mem",
+      "version": "1.0.0",
+      "source": { "path": "./plugin" },
+      "description": "Persistent memory system for Claude Code - context compression across sessions"
+    }
+  ]
+}
