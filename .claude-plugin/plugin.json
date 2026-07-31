@@ -1,0 +1,24 @@
+{
+  "name": "llm-mem",
+  "version": "1.0.0",
+  "description": "Memory compression system for Claude Code - persist context across sessions",
+  "author": {
+    "name": "ChenhyW"
+  },
+  "repository": "https://github.com/ChenhyW/llm-mem",
+  "license": "Apache-2.0",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "claude-agent-sdk",
+    "mcp",
+    "plugin",
+    "memory",
+    "compression",
+    "knowledge-graph",
+    "transcript",
+    "typescript",
+    "nodejs"
+  ],
+  "homepage": "https://github.com/ChenhyW/llm-mem#readme"
+}

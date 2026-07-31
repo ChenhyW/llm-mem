@@ -115,13 +115,13 @@ export function getHnswDir(): string {
 
 function resolveDataDir(): string {
   const { expandHome } = tryRequireSharedPaths();
-  const fromEnv = (process.env.CLAUDE_MEM_DATA_DIR || '').trim();
+  const fromEnv = (process.env.LLM_MEM_DATA_DIR || '').trim();
   if (fromEnv) return typeof expandHome === 'function' ? expandHome(fromEnv) : fromEnv;
   const { resolveDataDir: sharedResolve } = tryRequireSharedPaths();
   if (typeof sharedResolve === 'function') return sharedResolve();
   const { join } = require('path');
   const { homedir } = require('os');
-  return join(homedir(), '.claude-mem');
+  return join(homedir(), '.llm-mem');
 }
 
 function tryRequireSharedPaths() {

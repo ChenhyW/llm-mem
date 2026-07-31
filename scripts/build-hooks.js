@@ -73,14 +73,14 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
   const codexHook = (tail) => buildShellCommand({
     host: 'codex-cli', requireFile: 'bun-runner.js', requireFileSecondary: 'worker-service.cjs',
     trailingCommand: ccTrailing(...tail), notFoundMessage: 'claude-mem: plugin scripts not found',
-    extraEnv: { CLAUDE_MEM_CODEX_HOOK: '1' },
+    extraEnv: { LLM_MEM_CODEX_HOOK: '1' },
   });
   const codexStartupHook = () => buildShellCommand({
     host: 'codex-cli', requireFile: 'bun-runner.js', requireFileSecondary: 'worker-service.cjs',
     trailingCommand: [
-      '_V=$(CLAUDE_MEM_CODEX_HOOK=1 node "$_P/scripts/version-check.js" || true);',
+      '_V=$(LLM_MEM_CODEX_HOOK=1 node "$_P/scripts/version-check.js" || true);',
       'if [ -n "$_V" ]; then printf \'%s\\n\' "$_V"; else',
-      'CLAUDE_MEM_CODEX_HOOK=1', ...ccTrailing('hook', 'codex', 'context'),
+      'LLM_MEM_CODEX_HOOK=1', ...ccTrailing('hook', 'codex', 'context'),
       '; fi',
     ],
     notFoundMessage: 'claude-mem: plugin scripts not found',
@@ -133,6 +133,7 @@ function shellTemplateManifest(buildShellCommand, buildCodexWindowsCommand) {
         mcpExtraCandidates: ['$PWD/plugin', '$PWD'],
         mcpExtraCacheRoots: [
           '$HOME/.codex/plugins/cache/llm-mem-local/llm-mem',
+          '$_C/plugins/cache/ChenhyW/llm-mem',
         ],
       }),
     },

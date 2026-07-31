@@ -360,7 +360,7 @@ export class WorkerService implements WorkerRef {
     this.server.registerRoutes(new DataRoutes(this.paginationHelper, this.dbManager, this.sessionManager, this.sseBroadcaster, this, this.startTime));
     this.server.registerRoutes(new SettingsRoutes(this.settingsManager));
     this.server.registerRoutes(new LogsRoutes());
-    this.server.registerRoutes(new MemoryRoutes(this.dbManager, 'claude-mem'));
+    this.server.registerRoutes(new MemoryRoutes(this.dbManager, 'llm-mem'));
     this.server.registerRoutes(new ServerV1Routes({
       getDatabase: () => this.dbManager.getConnection(),
     }));
@@ -453,7 +453,16 @@ export class WorkerService implements WorkerRef {
 
       const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
 
-      const modeId = settings.CLAUDE_MEM_MODE;
+      // Apply LLM_MEM_OLLAMA_URL to process.env so the hnswlib-vector-search.py
+      // helper (and any subprocess that resolves the Ollama endpoint from the
+      // env) picks up the user-chosen value without needing a code reload.
+      const OLLAMA_URL = settings.LLM_MEM_OLLAMA_URL?.trim();
+      if (OLLAMA_URL && process.env.OLLAMA_URL !== OLLAMA_URL) {
+        process.env.OLLAMA_URL = OLLAMA_URL;
+        logger.info('WORKER', 'Applied OLLAMA_URL from settings', { OLLAMA_URL });
+      }
+
+      const modeId = settings.LLM_MEM_MODE;
       ModeManager.getInstance().loadMode(modeId);
       logger.info('SYSTEM', `Mode loaded: ${modeId}`);
 
@@ -476,12 +485,12 @@ export class WorkerService implements WorkerRef {
       logger.info('WORKER', 'Checking for one-time CWD remap...');
       runOneTimeCwdRemap();
 
-      const chromaEnabled = settings.CLAUDE_MEM_CHROMA_ENABLED !== 'false';
+      const chromaEnabled = settings.LLM_MEM_CHROMA_ENABLED !== 'false';
       if (chromaEnabled) {
         this.chromaMcpManager = ChromaMcpManager.getInstance();
         logger.info('SYSTEM', 'ChromaMcpManager initialized (lazy - connects on first use)');
       } else {
-        logger.info('SYSTEM', 'Chroma disabled via CLAUDE_MEM_CHROMA_ENABLED=false, skipping ChromaMcpManager');
+        logger.info('SYSTEM', 'Chroma disabled via LLM_MEM_CHROMA_ENABLED=false, skipping ChromaMcpManager');
       }
 
       logger.info('WORKER', 'Initializing database manager...');
@@ -527,15 +536,15 @@ export class WorkerService implements WorkerRef {
           chromaSync: this.dbManager.getChromaSync(),
         });
         this.syncClient = new SyncClient(syncApply, {
-          hubUrl: settings.CLAUDE_MEM_CLOUD_SYNC_HUB_URL,
-          token: settings.CLAUDE_MEM_CLOUD_SYNC_TOKEN,
-          userId: settings.CLAUDE_MEM_CLOUD_SYNC_USER_ID,
+          hubUrl: settings.LLM_MEM_CLOUD_SYNC_HUB_URL,
+          token: settings.LLM_MEM_CLOUD_SYNC_TOKEN,
+          userId: settings.LLM_MEM_CLOUD_SYNC_USER_ID,
           deviceId: pullDeviceId,
-          deviceName: settings.CLAUDE_MEM_CLOUD_SYNC_DEVICE_NAME,
+          deviceName: settings.LLM_MEM_CLOUD_SYNC_DEVICE_NAME,
           isSessionActive: () => this.sessionManager.getActiveSessionCount() > 0,
           // Advisory WebSocket (plan Phase 4): enabled by default alongside
-          // the hub URL; CLAUDE_MEM_CLOUD_SYNC_WS='false' pins HTTP-only.
-          wsEnabled: settings.CLAUDE_MEM_CLOUD_SYNC_WS !== 'false',
+          // the hub URL; LLM_MEM_CLOUD_SYNC_WS='false' pins HTTP-only.
+          wsEnabled: settings.LLM_MEM_CLOUD_SYNC_WS !== 'false',
           // While the socket is live, pushes debounce at the fast tier —
           // fan-out makes the push the delivery (Phase 4 task 3).
           onSocketLiveChange: (live) => cloudSyncForPull.setFastDebounce(live),
@@ -581,6 +590,25 @@ export class WorkerService implements WorkerRef {
       this.server.registerRoutes(new CloudSyncRoutes(this.dbManager));
       logger.info('WORKER', 'CloudSyncRoutes registered');
 
+      // Graceful restart endpoint (for UI "保存并重启"). Flushed response
+      // completes BEFORE shutdown so the HTTP reply always succeeds; the
+      // worker then runs runShutdownSequence(reason='restart') which spawns
+      // the successor. SSE client auto-reconnects on the new instance.
+      this.server.app.post('/api/restart', async (req, res) => {
+        if (this.isShuttingDown) {
+          res.status(503).json({ success: false, error: 'worker 正在关闭中，请等待后重试' });
+          return;
+        }
+        res.json({ success: true, message: '重启中，页面将在几秒后重新连接' });
+        res.flushHeaders();
+        // Flush response first so the client gets success even as the
+        // server begins winding down.
+        void this.shutdown('restart').catch(err => {
+          logger.error('WORKER', 'Restart failed', {}, err instanceof Error ? err : undefined);
+        });
+      });
+      logger.info('WORKER', 'Restart endpoint registered');
+
       this.initializationCompleteFlag = true;
       this.resolveInitialization();
       logger.info('SYSTEM', 'Core initialization complete (DB + search ready)');
@@ -593,8 +621,8 @@ export class WorkerService implements WorkerRef {
       const buildLifecycleProps = (): Record<string, unknown> => {
         const props: Record<string, unknown> = {
           runtime_mode: 'worker',
-          provider: settings.CLAUDE_MEM_PROVIDER,
-          mode: settings.CLAUDE_MEM_MODE,
+          provider: settings.LLM_MEM_PROVIDER,
+          mode: settings.LLM_MEM_MODE,
         };
         try {
           const row = this.dbManager.getConnection()
@@ -711,13 +739,13 @@ export class WorkerService implements WorkerRef {
   }
 
   private async startTranscriptWatcher(settings: ReturnType<typeof SettingsDefaultsManager.loadFromFile>): Promise<void> {
-    const transcriptsEnabled = settings.CLAUDE_MEM_TRANSCRIPTS_ENABLED !== 'false';
+    const transcriptsEnabled = settings.LLM_MEM_TRANSCRIPTS_ENABLED !== 'false';
     if (!transcriptsEnabled) {
-      logger.info('TRANSCRIPT', 'Transcript watcher disabled via CLAUDE_MEM_TRANSCRIPTS_ENABLED=false');
+      logger.info('TRANSCRIPT', 'Transcript watcher disabled via LLM_MEM_TRANSCRIPTS_ENABLED=false');
       return;
     }
 
-    const configPath = settings.CLAUDE_MEM_TRANSCRIPTS_CONFIG_PATH || DEFAULT_CONFIG_PATH;
+    const configPath = settings.LLM_MEM_TRANSCRIPTS_CONFIG_PATH || DEFAULT_CONFIG_PATH;
     const resolvedConfigPath = expandHomePath(configPath);
 
     if (!existsSync(resolvedConfigPath)) {
@@ -727,7 +755,7 @@ export class WorkerService implements WorkerRef {
       return;
     }
 
-    const allowCodexTranscriptIngestion = settings.CLAUDE_MEM_CODEX_TRANSCRIPT_INGESTION === 'true';
+    const allowCodexTranscriptIngestion = settings.LLM_MEM_CODEX_TRANSCRIPT_INGESTION === 'true';
     const { config: transcriptConfig, removed } = filterNativeHookBackedCodexWatches(
       loadTranscriptWatchConfig(configPath),
       allowCodexTranscriptIngestion
@@ -737,7 +765,7 @@ export class WorkerService implements WorkerRef {
     if (removed > 0) {
       logger.warn('TRANSCRIPT', 'Skipped Codex transcript watch because native Codex hooks are authoritative', {
         removed,
-        optInSetting: 'CLAUDE_MEM_CODEX_TRANSCRIPT_INGESTION=true',
+        optInSetting: 'LLM_MEM_CODEX_TRANSCRIPT_INGESTION=true',
       });
     }
 
@@ -933,7 +961,7 @@ function runServerServiceCli(command: string, extraArgs: string[] = []): void {
     windowsHide: true,
     // Strip host CLI bleed-through (CLAUDE_CODE_*, including EFFORT_LEVEL) and
     // Anthropic credentials before handing env to the spawned daemon. The
-    // daemon re-reads its own credentials from ~/.claude-mem/.env. See
+    // daemon re-reads its own credentials from ~/.llm-mem/.env. See
     // env-isolation discipline (#2357 / #2375).
     env: sanitizeEnv(process.env),
   });
@@ -1073,7 +1101,7 @@ async function main() {
 
   function exitWithStatus(status: 'ready' | 'error', message?: string): never {
     const output = buildStatusOutput(status, message, {
-      includeSuppressOutput: process.env.CLAUDE_MEM_CODEX_HOOK !== '1',
+      includeSuppressOutput: process.env.LLM_MEM_CODEX_HOOK !== '1',
     });
     console.log(JSON.stringify(output));
     process.exit(0);
@@ -1548,7 +1576,7 @@ async function fetchWorkerHealth(port: number, timeoutMs: number): Promise<Worke
  * hand keeps the output consistent with what `status` just reported.
  */
 function printQueueStatusIfBullMq(health: WorkerHealthSnapshot): void {
-  if (SettingsDefaultsManager.get('CLAUDE_MEM_QUEUE_ENGINE').trim().toLowerCase() !== 'bullmq') {
+  if (SettingsDefaultsManager.get('LLM_MEM_QUEUE_ENGINE').trim().toLowerCase() !== 'bullmq') {
     return;
   }
   const redis = health.queue?.redis;
@@ -1561,7 +1589,7 @@ function printQueueStatusIfBullMq(health: WorkerHealthSnapshot): void {
 }
 
 const isMainModule = typeof require !== 'undefined' && typeof module !== 'undefined'
-  ? require.main === module || !module.parent || process.env.CLAUDE_MEM_MANAGED === 'true'
+  ? require.main === module || !module.parent || process.env.LLM_MEM_MANAGED === 'true'
   : (Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href)
     || process.argv[1]?.endsWith('worker-service')
     || process.argv[1]?.endsWith('worker-service.cjs')

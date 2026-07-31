@@ -11,8 +11,8 @@ import {
 } from '../../shared/dependency-health.js';
 
 interface DependencyPreflightSettings {
-  CLAUDE_MEM_PROVIDER?: string;
-  CLAUDE_MEM_CHROMA_ENABLED?: string;
+  LLM_MEM_PROVIDER?: string;
+  LLM_MEM_CHROMA_ENABLED?: string;
 }
 
 interface ClassifiedClaudeSetupError {
@@ -77,7 +77,7 @@ async function hnswHelperIsAvailable(
 export async function runWorkerDependencyPreflight(
   options: WorkerDependencyPreflightOptions,
 ): Promise<DependencyHealthSnapshot> {
-  const provider = options.settings.CLAUDE_MEM_PROVIDER || 'claude';
+  const provider = options.settings.LLM_MEM_PROVIDER || 'claude';
 
   if (provider === 'claude') {
     const findClaudeExecutable =
@@ -103,7 +103,7 @@ export async function runWorkerDependencyPreflight(
   }
 
   const vectorSearchEnabled =
-    options.settings.CLAUDE_MEM_CHROMA_ENABLED !== 'false';
+    options.settings.LLM_MEM_CHROMA_ENABLED !== 'false';
   if (vectorSearchEnabled) {
     const available = await hnswHelperIsAvailable(options);
     if (available) {
@@ -130,7 +130,7 @@ export function runWorkerDependencyPreflightSync(
   // Compatibility wrapper: run the async preflight without awaiting so the
   // existing sync call-site keeps its return shape. The HNSW check is
   // fire-and-forget here; the worker's runtime helpers still probe it lazily.
-  const provider = options.settings.CLAUDE_MEM_PROVIDER || 'claude';
+  const provider = options.settings.LLM_MEM_PROVIDER || 'claude';
   if (provider === 'claude') {
     const findClaudeExecutable =
       options.findClaudeExecutable ??
@@ -154,7 +154,7 @@ export function runWorkerDependencyPreflightSync(
     clearDependencyStatus('claude_cli');
   }
 
-  if (options.settings.CLAUDE_MEM_CHROMA_ENABLED === 'false') {
+  if (options.settings.LLM_MEM_CHROMA_ENABLED === 'false') {
     clearDependencyStatus('hnsw_helper');
   } else {
     // Non-blocking async probe; clear a prior failure so a healthy worker
