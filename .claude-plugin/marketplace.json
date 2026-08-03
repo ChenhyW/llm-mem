@@ -1,15 +1,15 @@
 {
-  "name": "thedotmack",
+  "name": "ChenhyW",
   "owner": {
-    "name": "Alex Newman"
+    "name": "ChenhyW"
   },
   "metadata": {
-    "description": "Plugins by Alex Newman (thedotmack)"
+    "description": "Plugins by ChenhyW"
   },
   "plugins": [
     {
-      "name": "claude-mem",
-      "version": "13.12.4",
+      "name": "llm-mem",
+      "version": "1.0.0",
       "source": "./plugin",
       "description": "Persistent memory system for Claude Code - context compression across sessions"
     }
