@@ -987,8 +987,8 @@ process.on('SIGINT', cleanup);
 function detectMissingMarketplaceMarker(): void {
   const home = homedir();
   const marketplaceCandidates = [
-    resolve(home, '.claude', 'plugins', 'marketplaces', 'ChenhyW'),
-    resolve(home, '.config', 'claude', 'plugins', 'marketplaces', 'ChenhyW'),
+    resolve(home, '.claude', 'plugins', 'marketplaces', 'ChenhyW-llm-mem'),
+    resolve(home, '.config', 'claude', 'plugins', 'marketplaces', 'ChenhyW-llm-mem'),
   ];
   const present = marketplaceCandidates.some(p => p && existsSync(p));
   const cacheCandidates = [
