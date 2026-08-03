@@ -14,7 +14,7 @@ export function claudeConfigDirectory(): string {
 }
 
 export function marketplaceDirectory(): string {
-  return join(claudeConfigDirectory(), 'plugins', 'marketplaces', 'ChenhyW');
+  return join(claudeConfigDirectory(), 'plugins', 'marketplaces', 'ChenhyW-llm-mem');
 }
 
 export function pluginsDirectory(): string {
