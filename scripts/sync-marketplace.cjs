@@ -100,6 +100,18 @@ try {
   console.log(`Running bun install in cache folder (version ${version})...`);
   execSync(`bun install`, { cwd: CACHE_VERSION_PATH, stdio: 'inherit' });
 
+  // Ensure the plugin/scripts folder mirrors the full scripts/ directory.
+  // combined hooks.json resolves scripts via $_R/plugin/scripts, so all
+  // runtime scripts (mcp-server.cjs, worker-service.cjs, bun-runner.js, …)
+  // must live there. Top-level scripts/ holds the complete set, but it is
+  // not rsync'd when only plugin/ is synced into cache.
+  const scriptsSrc = path.join(rootDir, 'scripts');
+  const scriptsDst = path.join(CACHE_VERSION_PATH, 'plugin', 'scripts');
+  execSync(
+    `rsync -av --exclude=package.json --exclude=node_modules "${scriptsSrc}/" "${scriptsDst}/"`,
+    { stdio: 'inherit' }
+  );
+
   console.log('\x1b[32m%s\x1b[0m', 'Sync complete!');
 
 } catch (error) {
