@@ -515,14 +515,16 @@ export class ClaudeProvider {
           session.lastPromptNumber = message.prompt_number;
         }
 
+        const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+        const outputLang = settings.LLM_MEM_OUTPUT_LANGUAGE;
         const obsPrompt = buildObservationPrompt({
-          id: 0, // Not used in prompt
+          id: 0,
           tool_name: message.tool_name!,
           tool_input: JSON.stringify(message.tool_input),
           tool_output: JSON.stringify(message.tool_response),
           created_at_epoch: Date.now(),
           cwd: message.cwd
-        });
+        }, { language: outputLang });
         activeResponseContext.current = snapshotResponseContext(session);
 
         session.conversationHistory.push({ role: 'user', content: obsPrompt });
@@ -540,13 +542,15 @@ export class ClaudeProvider {
           isSynthetic: true
         };
       } else if (message.type === 'summarize') {
+        const sumSettings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+        const summaryOutputLang = sumSettings.LLM_MEM_OUTPUT_LANGUAGE;
         const summaryPrompt = buildSummaryPrompt({
           id: session.sessionDbId,
           memory_session_id: session.memorySessionId,
           project: session.project,
           user_prompt: session.userPrompt,
           last_assistant_message: message.last_assistant_message || ''
-        }, mode);
+        }, mode, { language: summaryOutputLang });
         activeResponseContext.current = snapshotResponseContext(session);
 
         session.conversationHistory.push({ role: 'user', content: summaryPrompt });

@@ -73,6 +73,7 @@ export interface SettingsDefaults {
   LLM_MEM_CLOUD_SYNC_HUB_URL: string;
   LLM_MEM_CLOUD_SYNC_DEVICE_ID: string;
   LLM_MEM_CLOUD_SYNC_DEVICE_NAME: string;
+  LLM_MEM_OUTPUT_LANGUAGE: string;  // 'zh' | 'en' — language for observation/summary output
   LLM_MEM_CLOUD_SYNC_WS: string;    // advisory WebSocket speed layer (Phase 4) — 'false' = HTTP polling only
   LLM_MEM_TELEGRAM_ENABLED: string;
   LLM_MEM_TELEGRAM_BOT_TOKEN: string;
@@ -167,6 +168,7 @@ export class SettingsDefaultsManager {
     LLM_MEM_CLOUD_SYNC_HUB_URL: '',  // sync-hub base URL (e.g. https://sync.cmem.ai). Empty = sync OFF
     LLM_MEM_CLOUD_SYNC_DEVICE_ID: '',      // Minted at first CloudSync start, then persisted back here
     LLM_MEM_CLOUD_SYNC_DEVICE_NAME: hostname(),  // Human-readable label for the cmem.ai Devices panel
+    LLM_MEM_OUTPUT_LANGUAGE: 'zh',
     LLM_MEM_CLOUD_SYNC_WS: 'true',  // Advisory WebSocket speed layer (plan Phase 4). 'false' = HTTP polling only — sync stays fully correct, just poll-latency (prime directive #2)
     LLM_MEM_TELEGRAM_ENABLED: 'true',
     LLM_MEM_TELEGRAM_BOT_TOKEN: '',

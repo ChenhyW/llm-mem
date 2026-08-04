@@ -202,6 +202,8 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
       throw new Error('Cannot process observations: memorySessionId not yet captured. This session may need to be reinitialized.');
     }
 
+    const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+    const outputLang = settings.LLM_MEM_OUTPUT_LANGUAGE;
     const obsPrompt = buildObservationPrompt({
       id: 0,
       tool_name: message.tool_name!,
@@ -209,7 +211,7 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
       tool_output: JSON.stringify(message.tool_response),
       created_at_epoch: originalTimestamp ?? Date.now(),
       cwd: message.cwd
-    });
+    }, { language: outputLang });
     const responseContext = snapshotResponseContext(session);
 
     session.conversationHistory.push({ role: 'user', content: obsPrompt });
@@ -253,13 +255,15 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
       throw new Error('Cannot process summary: memorySessionId not yet captured. This session may need to be reinitialized.');
     }
 
+    const summarySettings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+    const summaryOutputLang = summarySettings.LLM_MEM_OUTPUT_LANGUAGE;
     const summaryPrompt = buildSummaryPrompt({
       id: session.sessionDbId,
       memory_session_id: session.memorySessionId,
       project: session.project,
       user_prompt: session.userPrompt,
       last_assistant_message: message.last_assistant_message || ''
-    }, mode);
+    }, mode, { language: summaryOutputLang });
     const responseContext = snapshotResponseContext(session);
 
     session.conversationHistory.push({ role: 'user', content: summaryPrompt });

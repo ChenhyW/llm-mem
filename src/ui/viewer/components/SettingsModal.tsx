@@ -262,6 +262,16 @@ export function SettingsModal({
               <TextField value={modelValue}
                 onChange={v => set(modelKey, v)} />
             </Field>
+            <Field label="输出语言" tooltip="观察摘要写入数据库时的语言（en=英文，zh=中文）">
+              <SelectField
+                value={draft.LLM_MEM_OUTPUT_LANGUAGE ?? 'zh'}
+                onChange={v => set('LLM_MEM_OUTPUT_LANGUAGE', v)}
+                options={[
+                  { value: 'zh', label: '中文 (zh)' },
+                  { value: 'en', label: '英文 (en)' },
+                ]}
+              />
+            </Field>
             {draft.LLM_MEM_PROVIDER === 'claude' && (
               <div className="settings-field" style={{ opacity: 0.7 }}>
                 <span className="settings-field-label">Claude 认证方式</span>

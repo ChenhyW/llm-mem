@@ -118,7 +118,7 @@ function truncateObservationField(value: unknown, maxChars: number = OBS_PROMPT_
   return `${head}\n... <elided chars="${elidedChars}" original_size_chars="${raw.length}" reason="oversize" /> ...\n${tail}`;
 }
 
-export function buildObservationPrompt(obs: Observation): string {
+export function buildObservationPrompt(obs: Observation, opts?: { language?: string }): string {
   let toolInput: any;
   let toolOutput: any;
 
@@ -151,10 +151,20 @@ If a <parameters> or <outcome> block above contains an "<elided chars=... />" ma
 
 Return either one or more <observation>...</observation> blocks, or an empty response if this tool use should be skipped.
 Concrete debugging findings from logs, queue state, database rows, session routing, or code-path inspection count as durable discoveries and should be recorded.
-Never reply with prose such as "Skipping", "No substantive tool executions", or any explanation outside XML. Non-XML text is discarded.`;
+Never reply with prose such as "Skipping", "No substantive tool executions", or any explanation outside XML. Non-XML text is discarded.${languageFooter(opts?.language)}
+`;
 }
 
-export function buildSummaryPrompt(session: SDKSession, mode: ModeConfig): string {
+/** Append a short language directive so the model emits content in the requested language. */
+function languageFooter(lang?: string): string {
+  const l = (lang || '').trim().toLowerCase();
+  if (l === 'zh') {
+    return '\nRespond in Chinese (简体中文). The <observation>/<summary> content (request, investigated, learned, completed, next_steps, notes) must be written in Chinese.';
+  }
+  return '';
+}
+
+export function buildSummaryPrompt(session: SDKSession, mode: ModeConfig, opts?: { language?: string }): string {
   const lastAssistantMessage = session.last_assistant_message || (() => {
     logger.error('SDK', 'Missing last_assistant_message in session for summary prompt', {
       sessionId: session.id
@@ -185,7 +195,7 @@ ${mode.prompts.summary_format_instruction}
 </summary>
 
 REMINDER: Your response MUST use <summary> as the root tag, NOT <observation>.
-${mode.prompts.summary_footer}`;
+${mode.prompts.summary_footer}${languageFooter(opts?.language)}`;
 }
 
 export function buildContinuationPrompt(userPrompt: string, promptNumber: number, contentSessionId: string, mode: ModeConfig): string {

@@ -86,6 +86,7 @@ export interface Settings {
   LLM_MEM_OLLAMA_URL?: string;
   LLM_MEM_VECTOR_EMBEDDING_MODEL?: string;
   LLM_MEM_DISABLE_VECTOR_SEARCH?: string;
+  LLM_MEM_OUTPUT_LANGUAGE?: string;
 
   LLM_MEM_CONTEXT_SHOW_READ_TOKENS?: string;
   LLM_MEM_CONTEXT_SHOW_WORK_TOKENS?: string;
