@@ -259,37 +259,18 @@ export function SettingsModal({
                 onChange={v => set('LLM_MEM_MODEL', v)} />
             </Field>
             {draft.LLM_MEM_PROVIDER === 'claude' && (
-              <Field label="Claude 认证方式" tooltip="subscription / api-key / gateway / cli">
-                <SelectField
-                  value={draft.LLM_MEM_CLAUDE_AUTH_METHOD ?? 'subscription'}
-                  onChange={v => set('LLM_MEM_CLAUDE_AUTH_METHOD', v)}
-                  options={[
-                    { value: 'subscription', label: 'subscription (Claude SDK 登录)' },
-                    { value: 'api-key', label: 'api-key (ANTHROPIC_API_KEY)' },
-                    { value: 'gateway', label: 'gateway' },
-                    { value: 'cli', label: 'cli' },
-                  ]}
-                />
-              </Field>
+              <div className="settings-field" style={{ opacity: 0.7 }}>
+                <span className="settings-field-label">Claude 认证方式</span>
+                <span className="settings-input" style={{ color: 'var(--color-text-muted)', cursor: 'default' }}>
+                  subscription（Claude SDK 登录，在 Claude 中 /login 后生效）
+                </span>
+              </div>
             )}
             {draft.LLM_MEM_PROVIDER === 'gemini' && (
               <>
                 <Field label="Gemini API Key">
                   <TextField value={draft.LLM_MEM_GEMINI_API_KEY ?? ''}
                     onChange={v => set('LLM_MEM_GEMINI_API_KEY', v)} type="password" />
-                </Field>
-                <Field label="Gemini 模型">
-                  <SelectField
-                    value={draft.LLM_MEM_GEMINI_MODEL ?? 'gemini-flash-latest'}
-                    onChange={v => set('LLM_MEM_GEMINI_MODEL', v)}
-                    options={[
-                      { value: 'gemini-flash-latest', label: 'gemini-flash-latest' },
-                      { value: 'gemini-flash-lite-latest', label: 'gemini-flash-lite-latest' },
-                      { value: 'gemini-3.5-flash', label: 'gemini-3.5-flash' },
-                      { value: 'gemini-3.1-flash-lite', label: 'gemini-3.1-flash-lite' },
-                      { value: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
-                    ]}
-                  />
                 </Field>
                 <ToggleField label="启用限流"
                   value={draft.LLM_MEM_GEMINI_RATE_LIMITING_ENABLED ?? 'true'}
@@ -301,10 +282,6 @@ export function SettingsModal({
                 <Field label="OpenRouter API Key">
                   <TextField value={draft.LLM_MEM_OPENROUTER_API_KEY ?? ''}
                     onChange={v => set('LLM_MEM_OPENROUTER_API_KEY', v)} type="password" />
-                </Field>
-                <Field label="OpenRouter 模型">
-                  <TextField value={draft.LLM_MEM_OPENROUTER_MODEL ?? 'xiaomi/mimo-v2-flash:free'}
-                    onChange={v => set('LLM_MEM_OPENROUTER_MODEL', v)} />
                 </Field>
                 <Field label="OpenRouter Site URL" tooltip="用于 OpenRouter 统计（可选）">
                   <TextField value={draft.LLM_MEM_OPENROUTER_SITE_URL ?? ''}
@@ -444,7 +421,7 @@ export function SettingsModal({
           {renderTab()}
         </div>
 
-        <div className="settings-modal-footer modal-footer" style={{ justifyContent: 'space-between' }}>
+        <div className="settings-modal-footer modal-footer" style={{ justifyContent: 'flex-end' }}>
           <span className="settings-status save-status">{saveStatus}</span>
           <span className="settings-status save-status">{restartStatus}</span>
           <button className="save-btn" onClick={handleCancel}
