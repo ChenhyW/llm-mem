@@ -214,6 +214,12 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     }, { language: outputLang });
     const responseContext = snapshotResponseContext(session);
 
+    logger.info('SDK', 'obsPrompt raw (first 600 chars)', {
+      sessionId: session.sessionDbId,
+      lang: outputLang,
+      obsPromptHead: obsPrompt.length > 600 ? obsPrompt.slice(0, 600) : obsPrompt,
+      obsPromptLength: obsPrompt.length
+    });
     session.conversationHistory.push({ role: 'user', content: obsPrompt });
     session.lastPromptSentAt = Date.now();
     session.lastGeneratorSource = 'ingest';
@@ -266,6 +272,12 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     }, mode, { language: summaryOutputLang });
     const responseContext = snapshotResponseContext(session);
 
+    logger.info('SDK', 'summaryPrompt raw (first 600 chars)', {
+      sessionId: session.sessionDbId,
+      lang: summaryOutputLang,
+      summaryPromptHead: summaryPrompt.length > 600 ? summaryPrompt.slice(0, 600) : summaryPrompt,
+      summaryPromptLength: summaryPrompt.length
+    });
     session.conversationHistory.push({ role: 'user', content: summaryPrompt });
     session.lastPromptSentAt = Date.now();
     session.lastGeneratorSource = 'summarize';
