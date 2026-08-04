@@ -97,6 +97,23 @@ try {
     { stdio: 'inherit' }
   );
 
+  // Sync plugin/ui/ and plugin/modes/ into cache so the in-plugin worker
+  // (whose getPackageRoot resolves to the plugin/ dir) can locate them.
+  // rsync above copies plugin/ *contents* to the cache root, so these
+  // subdirs otherwise land at cache/1.0.0/{ui,modes}/ instead of
+  // cache/1.0.0/plugin/{ui,modes}/.
+  for (const sub of ['ui', 'modes']) {
+    const src = path.join(pluginDir, sub);
+    const dst = path.join(CACHE_VERSION_PATH, 'plugin', sub);
+    if (existsSync(src)) {
+      execSync(
+        `rsync -av --delete "${src}/" "${dst}/"`,
+        { stdio: 'inherit' }
+      );
+      console.log(`Synced plugin/${sub}/ into cache for in-plugin worker`);
+    }
+  }
+
   console.log(`Running bun install in cache folder (version ${version})...`);
   execSync(`bun install`, { cwd: CACHE_VERSION_PATH, stdio: 'inherit' });
 
