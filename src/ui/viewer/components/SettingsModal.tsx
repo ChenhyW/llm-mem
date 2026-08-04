@@ -283,13 +283,13 @@ export function SettingsModal({
             )}
             {draft.LLM_MEM_PROVIDER === 'openrouter' && (
               <>
-                <Field label="OpenRouter API Key">
+                <Field label="API Key">
                   <TextField value={draft.LLM_MEM_OPENROUTER_API_KEY ?? ''}
                     onChange={v => set('LLM_MEM_OPENROUTER_API_KEY', v)} type="password" />
                 </Field>
-                <Field label="OpenRouter Site URL" tooltip="用于 OpenRouter 统计（可选）">
-                  <TextField value={draft.LLM_MEM_OPENROUTER_SITE_URL ?? ''}
-                    onChange={v => set('LLM_MEM_OPENROUTER_SITE_URL', v)} />
+                <Field label="Base URL (可选)" tooltip="自定义网关地址，如 https://api.deepseek.com 或 http://localhost:1234/v1。留空则使用默认 OpenRouter 端点">
+                  <TextField value={draft.LLM_MEM_OPENROUTER_BASE_URL ?? ''}
+                    onChange={v => set('LLM_MEM_OPENROUTER_BASE_URL', v)} />
                 </Field>
                 <Field label="OpenRouter App Name">
                   <TextField value={draft.LLM_MEM_OPENROUTER_APP_NAME ?? 'llm-mem'}

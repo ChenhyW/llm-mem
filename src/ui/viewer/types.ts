@@ -78,7 +78,7 @@ export interface Settings {
   LLM_MEM_GEMINI_RATE_LIMITING_ENABLED?: string;
   LLM_MEM_OPENROUTER_API_KEY?: string;
   LLM_MEM_OPENROUTER_MODEL?: string;
-  LLM_MEM_OPENROUTER_SITE_URL?: string;
+  LLM_MEM_OPENROUTER_BASE_URL?: string;
   LLM_MEM_OPENROUTER_APP_NAME?: string;
   LLM_MEM_DATA_DIR?: string;
   LLM_MEM_LOG_LEVEL?: string;
