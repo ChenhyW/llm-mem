@@ -118,6 +118,17 @@ function truncateObservationField(value: unknown, maxChars: number = OBS_PROMPT_
   return `${head}\n... <elided chars="${elidedChars}" original_size_chars="${raw.length}" reason="oversize" /> ...\n${tail}`;
 }
 
+/** Emit a strong bilingual language directive at the very START of a prompt
+ *  (position 0 wins a recency tie-break at the beginning of context).
+ */
+function languageHeader(lang?: string): string {
+  const l = (lang || '').trim().toLowerCase();
+  if (l === 'zh') {
+    return `[OUTPUT LANGUAGE = Chinese / 简体中文 — CRITICAL: write ALL <observation> and <summary> content (request, investigated, learned, completed, next_steps, notes, narrative, subtitle, title, etc.) in Chinese (简体中文). Only the XML tags themselves (e.g. <observation>, <summary>) may stay in English. Do NOT write observation or summary content in English.`;
+  }
+  return '';
+}
+
 export function buildObservationPrompt(obs: Observation, opts?: { language?: string }): string {
   let toolInput: any;
   let toolOutput: any;
@@ -140,7 +151,8 @@ export function buildObservationPrompt(obs: Observation, opts?: { language?: str
     toolOutput = obs.tool_output;
   }
 
-  return `<observed_from_primary_session>
+  const _lang = languageHeader(opts?.language);
+  return `${_lang}\n<observed_from_primary_session>
   <what_happened>${obs.tool_name}</what_happened>
   <occurred_at>${new Date(obs.created_at_epoch).toISOString()}</occurred_at>${obs.cwd ? `\n  <working_directory>${obs.cwd}</working_directory>` : ''}
   <parameters>${truncateObservationField(toolInput)}</parameters>
@@ -151,24 +163,11 @@ If a <parameters> or <outcome> block above contains an "<elided chars=... />" ma
 
 Return either one or more <observation>...</observation> blocks, or an empty response if this tool use should be skipped.
 Concrete debugging findings from logs, queue state, database rows, session routing, or code-path inspection count as durable discoveries and should be recorded.
-Never reply with prose such as "Skipping", "No substantive tool executions", or any explanation outside XML. Non-XML text is discarded.${languageFooter(opts?.language)}
-`;
-}
-
-/** Append a strong bilingual language directive so the model emits content in the requested language.
- *  Placed at the very end of the prompt so it wins a recency-based attention tie-break.
- */
-function languageFooter(lang?: string): string {
-  const l = (lang || '').trim().toLowerCase();
-  if (l === 'zh') {
-    return '\n'
-      + 'IMPORTANT: 请使用中文（简体中文）撰写所有 <observation> 和 <summary> 的内容（包括 request、investigated、learned、completed、next_steps、notes、narrative 等字段）。\n'
-      + 'IMPORTANT: Write all <observation> and <summary> content (request, investigated, learned, completed, next_steps, notes, narrative, etc.) in Chinese (简体中文). Only the XML tags themselves may remain in English.';
-  }
-  return '';
+Never reply with prose such as "Skipping", "No substantive tool executions", or any explanation outside XML. Non-XML text is discarded.`;
 }
 
 export function buildSummaryPrompt(session: SDKSession, mode: ModeConfig, opts?: { language?: string }): string {
+  const _lang = languageHeader(opts?.language);
   const lastAssistantMessage = session.last_assistant_message || (() => {
     logger.error('SDK', 'Missing last_assistant_message in session for summary prompt', {
       sessionId: session.id
@@ -176,7 +175,7 @@ export function buildSummaryPrompt(session: SDKSession, mode: ModeConfig, opts?:
     return '';
   })();
 
-  return `--- ${SUMMARY_MODE_MARKER} ---
+  return `${_lang}\n--- ${SUMMARY_MODE_MARKER} ---
 ⚠️ CRITICAL TAG REQUIREMENT — READ CAREFULLY:
 • You MUST wrap your ENTIRE response in <summary>...</summary> tags.
 • Do NOT use <observation> tags. <observation> output will be DISCARDED and cause a system error.
@@ -199,7 +198,7 @@ ${mode.prompts.summary_format_instruction}
 </summary>
 
 REMINDER: Your response MUST use <summary> as the root tag, NOT <observation>.
-${mode.prompts.summary_footer}${languageFooter(opts?.language)}`;
+${mode.prompts.summary_footer}`;
 }
 
 export function buildContinuationPrompt(userPrompt: string, promptNumber: number, contentSessionId: string, mode: ModeConfig): string {
