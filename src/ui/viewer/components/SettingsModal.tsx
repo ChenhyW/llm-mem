@@ -213,10 +213,6 @@ export function SettingsModal({
       case 'basic':
         return (
           <CollapsibleSection title="基础配置">
-            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
-              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
-                onChange={v => set('LLM_MEM_MODEL', v)} />
-            </Field>
             <Field label="Worker 端口" tooltip="Worker HTTP 服务端口（改后需重启）">
               <TextField value={draft.LLM_MEM_WORKER_PORT ?? DEFAULT_SETTINGS.LLM_MEM_WORKER_PORT}
                 onChange={v => set('LLM_MEM_WORKER_PORT', v)} />
@@ -242,10 +238,6 @@ export function SettingsModal({
               <TextField value={draft.LLM_MEM_DATA_DIR ?? ''} placeholder="~/.llm-mem"
                 onChange={v => set('LLM_MEM_DATA_DIR', v)} />
             </Field>
-            <Field label="Python 版本" tooltip="用于向量搜索脚本的 Python 版本（如 3.13）">
-              <TextField value={draft.LLM_MEM_PYTHON_VERSION ?? '3.13'}
-                onChange={v => set('LLM_MEM_PYTHON_VERSION', v)} />
-            </Field>
           </CollapsibleSection>
         );
       case 'model':
@@ -261,6 +253,10 @@ export function SettingsModal({
                   { value: 'openrouter', label: 'openrouter (OpenRouter)' },
                 ]}
               />
+            </Field>
+            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
+              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
+                onChange={v => set('LLM_MEM_MODEL', v)} />
             </Field>
             {draft.LLM_MEM_PROVIDER === 'claude' && (
               <Field label="Claude 认证方式" tooltip="subscription / api-key / gateway / cli">
@@ -424,13 +420,13 @@ export function SettingsModal({
 
   return (
     <div className="modal-backdrop" onClick={handleCancel}>
-      <div className="settings-modal" onClick={e => e.stopPropagation()}>
-        <div className="settings-modal-header">
+      <div className="settings-modal context-settings-modal" onClick={e => e.stopPropagation()}>
+        <div className="settings-modal-header modal-header">
           <h2>设置</h2>
           <button className="close-btn" onClick={handleCancel}>×</button>
         </div>
 
-        <div className="settings-tabs">
+        <div className="settings-tabs" style={{ display: 'flex', gap: '6px', padding: '10px 20px 0 20px', borderBottom: '1px solid var(--color-border-secondary)', background: 'var(--color-bg-secondary)', overflowX: 'auto', flexShrink: 0 }}>
           {TABS.map(t => (
             <button
               key={t.key}
@@ -448,21 +444,21 @@ export function SettingsModal({
           {renderTab()}
         </div>
 
-        <div className="settings-modal-footer">
-          <span className="settings-status">{saveStatus}</span>
-          <span className="settings-status restart-status">{restartStatus}</span>
-          <button className="btn-secondary" onClick={handleCancel}
+        <div className="settings-modal-footer modal-footer" style={{ justifyContent: 'space-between' }}>
+          <span className="settings-status save-status">{saveStatus}</span>
+          <span className="settings-status save-status">{restartStatus}</span>
+          <button className="save-btn" onClick={handleCancel}
             disabled={isSaving || isRestarting}>取消</button>
-          <button className="btn-primary" onClick={handleSave}
+          <button className="save-btn" onClick={handleSave}
             disabled={isSaving || isRestarting}>
             {isSaving ? '保存中...' : '保存'}
           </button>
           <button
-            className="btn-warning"
+            className="save-btn"
+            style={{ background: 'var(--accent-color, #f0a000)' }}
             onClick={handleSaveAndRestart}
             disabled={isSaving || isRestarting}
-            title="保存配置并重启 Worker，使变更立即生效"
-          >
+            title="保存配置并重启 Worker，使变更立即生效">
             {isRestarting ? '重启中...' : '保存并重启'}
           </button>
         </div>
