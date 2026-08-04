@@ -209,6 +209,10 @@ export function SettingsModal({
   if (!isOpen) return null;
 
   const renderTab = () => {
+    const provider = draft.LLM_MEM_PROVIDER ?? DEFAULT_SETTINGS.LLM_MEM_PROVIDER;
+    const modelKey = provider === 'openrouter' ? 'LLM_MEM_OPENROUTER_MODEL' : 'LLM_MEM_MODEL';
+    const modelValue = draft[modelKey] ?? DEFAULT_SETTINGS[modelKey];
+
     switch (activeTab) {
       case 'basic':
         return (
@@ -254,9 +258,9 @@ export function SettingsModal({
                 ]}
               />
             </Field>
-            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
-              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
-                onChange={v => set('LLM_MEM_MODEL', v)} />
+            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称（随 Provider 自动切换字段）">
+              <TextField value={modelValue}
+                onChange={v => set(modelKey, v)} />
             </Field>
             {draft.LLM_MEM_PROVIDER === 'claude' && (
               <div className="settings-field" style={{ opacity: 0.7 }}>
