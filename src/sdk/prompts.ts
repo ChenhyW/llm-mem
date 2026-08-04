@@ -155,11 +155,15 @@ Never reply with prose such as "Skipping", "No substantive tool executions", or 
 `;
 }
 
-/** Append a short language directive so the model emits content in the requested language. */
+/** Append a strong bilingual language directive so the model emits content in the requested language.
+ *  Placed at the very end of the prompt so it wins a recency-based attention tie-break.
+ */
 function languageFooter(lang?: string): string {
   const l = (lang || '').trim().toLowerCase();
   if (l === 'zh') {
-    return '\nRespond in Chinese (简体中文). The <observation>/<summary> content (request, investigated, learned, completed, next_steps, notes) must be written in Chinese.';
+    return '\n'
+      + 'IMPORTANT: 请使用中文（简体中文）撰写所有 <observation> 和 <summary> 的内容（包括 request、investigated、learned、completed、next_steps、notes、narrative 等字段）。\n'
+      + 'IMPORTANT: Write all <observation> and <summary> content (request, investigated, learned, completed, next_steps, notes, narrative, etc.) in Chinese (简体中文). Only the XML tags themselves may remain in English.';
   }
   return '';
 }
