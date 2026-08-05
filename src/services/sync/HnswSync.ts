@@ -166,8 +166,8 @@ export class HnswSync {
 
   static async backfillAllProjects(_store: unknown): Promise<void> {
     const { DB_PATH } = await import('../../shared/paths.js');
-    const sqlite3 = await import('node:sqlite');
-    const db = new sqlite3.DatabaseSync(DB_PATH);
+    const sqlite3 = await import('bun:sqlite');
+    const db = new sqlite3.Database(DB_PATH);
     const { runMetadataObservationsMigration } = await import('./migration.js');
     const res = runMetadataObservationsMigration(db);
     logger.info('HNSW_SYNC', 'migration', { created: res.created });

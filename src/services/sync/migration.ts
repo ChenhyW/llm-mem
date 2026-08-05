@@ -1,4 +1,3 @@
-import sqlite3 from "node:sqlite";
 
 /**
  * Create the `metadata_observations` table that maps sqlite row ids back to
@@ -6,7 +5,7 @@ import sqlite3 from "node:sqlite";
  * (observation, session summary, user prompt).
  */
 export function runMetadataObservationsMigration(
-  db: sqlite3.DatabaseSync,
+  db: any,  // bun:sqlite.Database / node:sqlite.DatabaseSync (runtime APIs are compatible)
 ): { created: boolean } {
   const existing = db
     .prepare(
