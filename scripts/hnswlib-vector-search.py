@@ -339,6 +339,7 @@ def cmd_search(args):
         return
 
     arr = _load_vector_bin(hnsw_dir)
+    k = min(k, len(arr))  # k cannot exceed number of index elements
     index = hnswlib.Index(space="cosine", dim=dim)
     index.init_index(
         max_elements=max(40, len(arr)),
@@ -346,11 +347,23 @@ def cmd_search(args):
         M=16,
         random_seed=42,
     )
-    index.set_ef(40)
+    index.set_ef(max(40, k))  # ef must be >= k for hnswlib knn_query to succeed
     _build_index_in_memory(index, arr, list(range(len(arr))))
     id_map = load_id_map(hnsw_dir)
 
-    labelk, distk = index.knn_query(np.array([q], dtype=np.float32), k=k)
+    try:
+        labelk, distk = index.knn_query(np.array([q], dtype=np.float32), k=k)
+    except RuntimeError:
+        if k > 1:
+            try:
+                k = max(1, k - 1)
+                labelk, distk = index.knn_query(np.array([q], dtype=np.float32), k=k)
+            except Exception as e2:
+                print(json.dumps({"results": [], "error": f"hnswlib knn_query(k={k}): {e2}"}, ensure_ascii=False))
+                return
+        else:
+            print(json.dumps({"results": [], "error": "hnswlib knn_query(k=1) failed"}, ensure_ascii=False))
+            return
     out = []
     for rank, label in enumerate(labelk[0]):
         meta = id_map.get(int(label))
