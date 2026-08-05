@@ -100,7 +100,22 @@ export class DataRoutes extends BaseRouteHandler {
     app.get('/api/processing-status', this.handleGetProcessingStatus.bind(this));
 
     app.post('/api/import', validateBody(importSchema), this.handleImport.bind(this));
+
+    app.post('/api/prompts/semantic-context', validateBody(this.semanticContextPayloadSchema), this.handleSetPromptSemanticContext.bind(this));
   }
+
+  private static readonly semanticContextPayloadSchema = z.object({
+    sessionDbId: z.number().int().positive(),
+    promptNumber: z.number().int().min(0),
+    semanticContext: z.string().optional(),
+  }).passthrough();
+
+  private handleSetPromptSemanticContext = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
+    const { sessionDbId, promptNumber, semanticContext } = req.body as z.infer<typeof DataRoutes.semanticContextPayloadSchema>;
+    const store = this.dbManager.getSessionStore();
+    const updateOk = store.setPromptSemanticContext(sessionDbId, promptNumber, semanticContext ?? '');
+    res.json({ success: true, updated: updateOk });
+  });
 
   private handleGetObservations = this.wrapHandler((req: Request, res: Response): void => {
     const { offset, limit, project, platformSource } = this.parsePaginationParams(req);

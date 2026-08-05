@@ -74,6 +74,8 @@ interface SdkSessionDetailRow {
 export class SessionStore {
   public db: Database;
 
+  private promptHasSemanticContextColumn: boolean | undefined = undefined;
+
   constructor(dbPathOrDb: string | Database = DB_PATH) {
     if (dbPathOrDb instanceof Database) {
       this.db = dbPathOrDb;
@@ -2505,6 +2507,65 @@ export class SessionStore {
     return result?.prompt_text ?? null;
   }
 
+  /**
+   * Persists the semantic injection block (## Relevant Past Work) onto a prompt
+   * record so the UI can surface it in the PromptCard.
+   */
+  setPromptSemanticContext(sessionDbId: number, promptNumber: number, semanticContext: string): boolean {
+    this.maybeEnsurePromptSemanticContextColumn();
+
+    if (!this.promptHasSemanticContextColumn) {
+      return false;
+    }
+
+    const trimmed = semanticContext?.trim() ?? '';
+    const empty = trimmed === '' ? null : trimmed;
+
+    const stmt = this.db.prepare(`
+      UPDATE user_prompts
+      SET semantic_context = ?
+      WHERE session_db_id = ?
+        AND prompt_number = ?
+    `);
+
+    const result = stmt.run(empty, sessionDbId, promptNumber);
+    return result.changes > 0;
+  }
+
+  /**
+   * Adds the semantic_context TEXT column to user_prompts so that each prompt
+   * record can remember the injected semantic context block.  Backed by
+   * schema_versions v49.
+   */
+  private maybeEnsurePromptSemanticContextColumn(): void {
+    if (this.promptHasSemanticContextColumn !== undefined) {
+      return;
+    }
+
+    const cols = this.db.prepare(`PRAGMA table_info(user_prompts)`).all() as Array<{ name: string }>;
+    const hasColumn = cols.some(c => c.name === 'semantic_context');
+
+    if (hasColumn) {
+      this.promptHasSemanticContextColumn = true;
+      return;
+    }
+
+    try {
+      this.db.run('ALTER TABLE user_prompts ADD COLUMN semantic_context TEXT');
+    } catch (err) {
+      logger.warn('DB', 'Migration #49: add semantic_context column to user_prompts failed', err as Error);
+      this.promptHasSemanticContextColumn = false;
+      return;
+    }
+
+    const applied = this.db.prepare('SELECT version FROM schema_versions WHERE version = ?').get(49) as SchemaVersion | undefined;
+    if (applied === undefined) {
+      this.db.prepare('INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)').run(49, new Date().toISOString());
+    }
+
+    this.promptHasSemanticContextColumn = true;
+  }
+
   storeObservation(
     memorySessionId: string,
     project: string,
@@ -2791,7 +2852,6 @@ export class SessionStore {
     `);
 
     const rows = stmt.all(...params) as UserPromptRecord[];
-    if (!preserveIdOrder) return rows;
 
     const rowMap = new Map(rows.map(r => [r.id, r]));
     const ordered = ids.map(id => rowMap.get(id)).filter((r): r is UserPromptRecord => !!r);

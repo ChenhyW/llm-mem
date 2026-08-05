@@ -27,4 +27,7 @@ export const DEFAULT_SETTINGS = {
 
   LLM_MEM_OLLAMA_URL: 'http://127.0.0.1:11434',
   LLM_MEM_VECTOR_EMBEDDING_MODEL: 'nomic-embed-text',
+
+  LLM_MEM_SEMANTIC_INJECT: 'false',
+  LLM_MEM_SEMANTIC_INJECT_LIMIT: '5',
 } as const;

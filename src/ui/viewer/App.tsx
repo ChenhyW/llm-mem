@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Feed } from './components/Feed';
+import { SemanticTestPanel } from './components/SemanticTestPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { LogsDrawer } from './components/LogsModal';
 import { WelcomeCard, getStoredWelcomeDismissed, setStoredWelcomeDismissed } from './components/WelcomeCard';
@@ -11,8 +12,39 @@ import { useTheme } from './hooks/useTheme';
 import { Observation, Summary, UserPrompt } from './types';
 import { mergeAndDeduplicateByProject } from './utils/data';
 
+type AppTab = 'observations' | 'inject-test';
+
+const TABS: Array<{ key: AppTab; label: string; icon: React.ReactNode }> = [
+  {
+    key: 'observations',
+    label: '观察记忆',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    ),
+  },
+  {
+    key: 'inject-test',
+    label: '注入测试',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="16 3 21 3 21 8" />
+        <line x1="4" y1="20" x2="20" y2="4" />
+        <polyline points="21 16 21 21 16 21" />
+        <line x1="15" y1="15" x2="21" y2="21" />
+        <line x1="4" y1="4" x2="9" y2="9" />
+      </svg>
+    ),
+  },
+];
+
 export function App() {
   const [currentFilter, setCurrentFilter] = useState('');
+  const [appTab, setAppTab] = useState<AppTab>('observations');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [logsModalOpen, setLogsModalOpen] = useState(false);
   const [welcomeDismissed, setWelcomeDismissed] = useState<boolean>(getStoredWelcomeDismissed);
@@ -101,6 +133,7 @@ export function App() {
 
   return (
     <>
+    <div className="app-container">
       <Header
         projects={projects}
         currentFilter={currentFilter}
@@ -116,26 +149,48 @@ export function App() {
         }}
       />
 
-      <Feed
-        observations={allObservations}
-        summaries={allSummaries}
-        prompts={allPrompts}
-        onLoadMore={handleLoadMore}
-        isLoading={
-          pagination.observations.isLoading ||
-          pagination.summaries.isLoading ||
-          pagination.prompts.isLoading
-        }
-        hasMore={
-          pagination.observations.hasMore ||
-          pagination.summaries.hasMore ||
-          pagination.prompts.hasMore
-        }
-      />
+      <div className="app-tabs">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            className={`app-tab ${appTab === t.key ? 'active' : ''}`}
+            onClick={() => setAppTab(t.key)}
+            type="button"
+          >
+            {t.icon}
+            <span>{t.label}</span>
+          </button>
+        ))}
+      </div>
 
-      {!welcomeDismissed && (
-        <WelcomeCard onDismiss={() => setWelcomeDismissed(true)} />
-      )}
+      <div className="app-body">
+        {appTab === 'observations' ? (
+          <>
+            <Feed
+              observations={allObservations}
+              summaries={allSummaries}
+              prompts={allPrompts}
+              onLoadMore={handleLoadMore}
+              isLoading={
+                pagination.observations.isLoading ||
+                pagination.summaries.isLoading ||
+                pagination.prompts.isLoading
+              }
+              hasMore={
+                pagination.observations.hasMore ||
+                pagination.summaries.hasMore ||
+                pagination.prompts.hasMore
+              }
+            />
+
+            {!welcomeDismissed && (
+              <WelcomeCard onDismiss={() => setWelcomeDismissed(true)} />
+            )}
+          </>
+        ) : (
+          <SemanticTestPanel projects={projects} />
+        )}
+      </div>
 
       <SettingsModal
         isOpen={settingsOpen}
@@ -165,6 +220,7 @@ export function App() {
         isOpen={logsModalOpen}
         onClose={toggleLogsModal}
       />
+    </div>
     </>
   );
 }

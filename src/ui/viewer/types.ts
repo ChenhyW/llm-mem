@@ -39,6 +39,7 @@ export interface UserPrompt {
   prompt_number: number;
   prompt_text: string;
   created_at_epoch: number;
+  semantic_context?: string | null;
 }
 
 export type FeedItem =
@@ -102,6 +103,9 @@ export interface Settings {
   LLM_MEM_TELEGRAM_ENABLED?: string;
   LLM_MEM_TELEGRAM_BOT_TOKEN?: string;
   LLM_MEM_TELEGRAM_CHAT_ID?: string;
+
+  LLM_MEM_SEMANTIC_INJECT?: string;
+  LLM_MEM_SEMANTIC_INJECT_LIMIT?: string;
 }
 
 export interface DependencyStatus {

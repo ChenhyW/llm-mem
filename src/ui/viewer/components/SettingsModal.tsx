@@ -375,6 +375,20 @@ export function SettingsModal({
             <CollapsibleSection title="上下文预览">
               <TerminalPreview content={contextPreview.preview || ''} />
             </CollapsibleSection>
+            <CollapsibleSection title="语义注入（按提示词检索）">
+              <ToggleField label="启用语义注入"
+                value={draft.LLM_MEM_SEMANTIC_INJECT ?? 'false'}
+                onChange={v => set('LLM_MEM_SEMANTIC_INJECT', v)} />
+              <div className="settings-field">
+                <span className="settings-field-label" style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  提示：开启后每次用户输入时会按语义检索相关记忆；仅 Worker 模式生效，Server 模式跳过。
+                </span>
+              </div>
+              <Field label="注入条数 (LLM_MEM_SEMANTIC_INJECT_LIMIT)" tooltip="每次用户输入时最多注入的相关记忆条数 (1-20)">
+                <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_LIMIT ?? '5'}
+                  onChange={v => set('LLM_MEM_SEMANTIC_INJECT_LIMIT', v)} />
+              </Field>
+            </CollapsibleSection>
           </>
         );
       case 'diagnosis':

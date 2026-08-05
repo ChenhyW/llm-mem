@@ -156,6 +156,26 @@ export const sessionInitHandler: EventHandler = {
       if (!dependencies.isWorkerFallback(semanticResult) && semanticResult?.context) {
         logger.debug('HOOK', `Semantic injection: ${semanticResult.count} observations for prompt`, { sessionId: sessionDbId, count: semanticResult.count });
         additionalContext = semanticResult.context;
+
+        // Persist the injected semantic context onto the prompt record so the UI
+        // can surface it in the PromptCard.  Fire-and-forget: a failure must not
+        // block normal injection.
+        try {
+          await dependencies.executeWithWorkerFallback(
+            '/api/prompts/semantic-context',
+            'POST',
+            {
+              sessionDbId: Number(sessionDbId),
+              promptNumber: Number(promptNumber),
+              semanticContext: additionalContext,
+            },
+          );
+        } catch (err) {
+          logger.warn('HOOK', 'Failed to persist semantic context for prompt', {
+            sessionId: sessionDbId,
+            promptNumber
+          }, err as Error);
+        }
       }
     }
 
