@@ -24,10 +24,17 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
       return;
     }
     setResult({ status: 'loading', context: '', count: 0 });
-    const params = new URLSearchParams({ q: query.trim(), limit: String(limit) });
-    if (selectedProject) params.append('project', selectedProject);
+    const body = {
+      q: query.trim(),
+      limit: String(limit),
+      ...(selectedProject ? { project: selectedProject } : {}),
+    };
     try {
-      const resp = await fetch(`${API_ENDPOINTS.SEMANTIC_CONTEXT}?${params}`);
+      const resp = await fetch(API_ENDPOINTS.SEMANTIC_CONTEXT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       if (!resp.ok) {
         const errText = await resp.text().catch(() => '');
         setResult({ status: 'error', context: '', count: 0, message: `请求失败 (${resp.status})${errText ? ': ' + errText : ''}` });
