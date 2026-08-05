@@ -380,6 +380,8 @@ export class SearchManager {
     const chromaResults = await this.queryChroma(query, 100, whereFilter);
     logger.debug('SEARCH', 'ChromaDB returned semantic matches', { matchCount: chromaResults.ids.length });
 
+    const minScore = typeof options.minScore === 'number' ? options.minScore : 0;
+
     if (chromaResults.ids.length > 0) {
       const { dateRange } = options;
       let startEpoch: number | undefined;
@@ -402,13 +404,15 @@ export class SearchManager {
 
       const recentMetadata = chromaResults.metadatas.map((meta, idx) => ({
         id: chromaResults.ids[idx],
+        score: 1 - (chromaResults.distances[idx] || 0),
         meta,
         isRecent: meta && meta.created_at_epoch != null
           && (!startEpoch || meta.created_at_epoch >= startEpoch)
           && (!endEpoch || meta.created_at_epoch <= endEpoch)
+          && (!minScore || (1 - (chromaResults.distances[idx] || 0)) >= minScore)
       })).filter(item => item.isRecent);
 
-      logger.debug('SEARCH', dateRange ? 'Results within user date range' : 'Results within 90-day window', { count: recentMetadata.length });
+      logger.debug('SEARCH', 'Results after recency + minScore filter', { count: recentMetadata.length, minScore });
 
       const obsIds: number[] = [];
       const sessionIds: number[] = [];

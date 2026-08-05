@@ -93,20 +93,25 @@ def _open_db(db_path: str):
     return sqlite3.connect(db_path, timeout=60)
 
 
-def fetch_indexable_rows(db_path: str, limit: int | None = None):
-    """Return rows from metadata_observations suitable for indexing.
+def fetch_indexable_rows(db_path: str, limit: int | None = None, doc_type: str | None = None):
+    """Return rows from metadata_observations suitable for indexing, optionally filtered by doc_type.
 
     Schema assumed:
       id, sqlite_id, doc_type, field_type, document, project,
       platform_source, created_at_epoch
     """
     rows: list[dict] = []
+    sql = (
+        "SELECT id, sqlite_id, doc_type, field_type, document, project, "
+        "platform_source, created_at_epoch FROM metadata_observations"
+    )
+    params: list[str] = []
+    if doc_type:
+        sql += " WHERE doc_type = ?"
+        params.append(doc_type)
+    sql += " ORDER BY created_at_epoch DESC"
     with _open_db(db_path) as con:
-        cur = con.execute(
-            "SELECT id, sqlite_id, doc_type, field_type, document, project, "
-            "platform_source, created_at_epoch FROM metadata_observations "
-            "ORDER BY created_at_epoch DESC"
-        )
+        cur = con.execute(sql, params)
         cols = [d[0] for d in cur.description]
         for r in cur:
             rows.append(dict(zip(cols, r)))
@@ -252,7 +257,7 @@ def cmd_build(args):
     limit = args.limit
 
     ensure_table(db_path)
-    rows = fetch_indexable_rows(db_path, limit)
+    rows = fetch_indexable_rows(db_path, limit, doc_type='observation')
     doc_texts = [r.get("document", "") for r in rows]
 
     # Embed via Ollama. Fall back to random vectors when retriever is disabled

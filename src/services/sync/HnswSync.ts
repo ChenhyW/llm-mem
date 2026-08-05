@@ -56,6 +56,10 @@ export class HnswSync {
         logger.warn('HNSW_SYNC', 'search helper non-zero exit', { stderr: result.stderr });
         return { ids: [], distances: [], metadatas: [] };
       }
+      if (!result.stdout?.trim()) {
+        logger.warn('HNSW_SYNC', 'search helper returned empty stdout', {});
+        return { ids: [], distances: [], metadatas: [] };
+      }
       const json = JSON.parse(result.stdout.trim()) as { results: any[] };
       const rows = json.results || [];
 

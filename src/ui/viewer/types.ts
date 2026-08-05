@@ -106,6 +106,7 @@ export interface Settings {
 
   LLM_MEM_SEMANTIC_INJECT?: string;
   LLM_MEM_SEMANTIC_INJECT_LIMIT?: string;
+  LLM_MEM_SEMANTIC_INJECT_MIN_SCORE?: string;
 }
 
 export interface DependencyStatus {

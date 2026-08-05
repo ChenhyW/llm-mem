@@ -379,6 +379,8 @@ export class SearchRoutes extends BaseRouteHandler {
     const limit = Math.min(Math.max(parseInt(String(req.body?.limit || req.query.limit || '5'), 10) || 5, 1), 20);
     const platformSource = this.getOptionalPlatformSourceFromRequest(req);
 
+    logger.info('HTTP', 'DIAG semantic context', { query_len: query.length, project, limit, query });
+
     if (!query || query.length < 20) {
       res.json({ context: '', count: 0 });
       return;
@@ -386,12 +388,14 @@ export class SearchRoutes extends BaseRouteHandler {
 
     let result: any;
     try {
+      const settings = this.getCachedSettings();
       result = await this.searchManager.search({
         query,
         type: 'observations',
         project,
         limit: String(limit),
         format: 'json',
+        minScore: parseFloat(settings?.['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE' as any] ?? '0.75'),
         ...(platformSource ? { platformSource } : {}),
       });
     } catch (error) {

@@ -253,6 +253,9 @@ export function SettingsModal({ isOpen, onClose, settings, onSave, isSaving, sav
               <FieldWithDesc label="注入条数" desc="每次语义注入时最多拼入的相关记忆条数（1-20）。默认 5，数量越多信息越丰富但提示词越长。" >
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_LIMIT ?? '5'} onChange={v => set('LLM_MEM_SEMANTIC_INJECT_LIMIT', v)} />
               </FieldWithDesc>
+              <FieldWithDesc label="最低匹配分数" desc="语义注入时只返回分数 ≥ 此值的记忆（0-1）。默认 0.75，值越高结果越精准但可能无匹配；设 0 关闭过滤。">
+                <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_SCORE ?? '0.75'} onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_SCORE', v)} />
+              </FieldWithDesc>
             </CollapsibleSection>
           </>
         );
