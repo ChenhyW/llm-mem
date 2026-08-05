@@ -114,12 +114,31 @@ export function useContextPreview(settings: Settings): UseContextPreviewResult {
     setIsLoading(false);
   }, [selectedProject, selectedSource]);
 
+  // Fetch preview whenever settings change or the selected project/source resolves.
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      refresh();
+    if (!selectedProject) {
+      setPreview('No project selected');
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    const params = new URLSearchParams({ project: selectedProject });
+    if (selectedSource) params.append('platformSource', selectedSource);
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/context/preview?${params}`, { signal: controller.signal })
+        .then(async resp => {
+          const text = await resp.text();
+          if (cancelled) return;
+          if (resp.ok) { setPreview(text); setError(null); }
+          else { setPreview(''); setError('Failed to load preview'); }
+        })
+        .catch(() => { if (!cancelled) { setPreview(''); setError('Failed to load preview'); } })
+        .finally(() => { if (!cancelled) setIsLoading(false); });
     }, 300);
-    return () => clearTimeout(timeout);
-  }, [settings, refresh]);
+    return () => { cancelled = true; clearTimeout(timer); controller.abort(); };
+  }, [settings, selectedProject, selectedSource]);
 
   return {
     preview,
