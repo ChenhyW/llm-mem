@@ -224,7 +224,29 @@ export function SettingsModal({ isOpen, onClose, settings, onSave, isSaving, sav
               <ToggleWithDesc label="显示最近消息" desc="在注入的上下文块中附加最近一次对话的最后几条消息原文。" value={draft.LLM_MEM_CONTEXT_SHOW_LAST_MESSAGE ?? 'false'} onChange={v => set('LLM_MEM_CONTEXT_SHOW_LAST_MESSAGE', v)} />
             </CollapsibleSection>
             <CollapsibleSection title="上下文预览">
-              <TerminalPreview content={contextPreview.preview || ''} />
+              <div className="settings-field" style={{ padding: '8px 10px', marginBottom: 8 }}>
+                <div className="settings-field-label" style={{ marginBottom: 6 }}>
+                  <span className="settings-field-name">项目</span>
+                  <span className="settings-field-desc">选择要预览注入上下文的项目；换项目后预览会自动刷新。</span>
+                </div>
+                <div className="settings-field-input">
+                  <select value={contextPreview.selectedProject ?? ''} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => contextPreview.setSelectedProject(e.target.value)} className="settings-input">
+                    {contextPreview.projects.length === 0 && <option>(暂无项目)</option>}
+                    {contextPreview.projects.map(p => (<option key={p} value={p}>{p}</option>))}
+                  </select>
+                </div>
+              </div>
+              <div className="settings-field" style={{ padding: '6px 10px', marginBottom: 8 }}>
+                <span className="settings-field-desc">预览使用服务器持久化的设置生成，仅用于确认注入内容的结构；弹框中的「显示选项」开关需要在「保存并重启」后才反映到真实注入。</span>
+              </div>
+              <div className="context-preview-terminal">
+                <TerminalPreview content={contextPreview.preview || ''} isLoading={contextPreview.isLoading} />
+                {contextPreview.error && (
+                  <div className="settings-field" style={{ padding: '8px 10px', marginTop: 6, border: '1px solid var(--accent-color, #ef4444)', borderRadius: 6 }}>
+                    <span className="settings-field-desc" style={{ color: 'var(--accent-color, #ef4444)' }}>预览加载失败：{contextPreview.error}</span>
+                  </div>
+                )}
+              </div>
             </CollapsibleSection>
             <CollapsibleSection title="语义注入（按提示词检索）">
               <ToggleWithDesc label="启用语义注入" desc="开启后每次用户输入（≥20 字）时会按语义检索相关记忆并拼入提示词。仅 Worker 模式生效，Server 模式跳过；禁用向量搜索后会退化为关键词检索。" value={draft.LLM_MEM_SEMANTIC_INJECT ?? 'false'} onChange={v => set('LLM_MEM_SEMANTIC_INJECT', v)} />
