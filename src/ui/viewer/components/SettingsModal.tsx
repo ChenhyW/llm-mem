@@ -250,6 +250,9 @@ export function SettingsModal({
       } else if (data.status === 'running') {
         setIsRebuilding(true);
         setRebuildStatus('向量重算已在运行中');
+      } else if (data.status === 'skipped') {
+        setIsRebuilding(false);
+        setRebuildStatus(data.message || '索引已存在，无需重建');
       } else {
         setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
       }
