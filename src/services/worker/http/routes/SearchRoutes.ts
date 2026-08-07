@@ -382,44 +382,61 @@ export class SearchRoutes extends BaseRouteHandler {
     logger.info('HTTP', 'DIAG semantic context', { query_len: query.length, project, limit, query });
 
     if (!query || query.length < 20) {
-      res.json({ context: '', count: 0 });
+      res.json({ context: '', count: 0, threshold: 0, results: [] });
       return;
     }
 
     let result: any;
+    let minScore = 0.75;
     try {
-      const settings = this.getCachedSettings();
+      const settings = this.getCachedSettings() as any;
+      minScore = parseFloat(settings?.['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE'] ?? '0.75');
       result = await this.searchManager.search({
         query,
         type: 'observations',
         project,
         limit: String(limit),
         format: 'json',
-        minScore: parseFloat(settings?.['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE' as any] ?? '0.75'),
+        minScore: 0, // fetch all results; we'll filter & display scores ourselves
         ...(platformSource ? { platformSource } : {}),
       });
     } catch (error) {
       const normalizedError = error instanceof Error ? error : new Error(String(error));
       logger.error('HTTP', 'Semantic context query failed', { query, project, platformSource }, normalizedError);
-      res.json({ context: '', count: 0 });
+      res.json({ context: '', count: 0, threshold: minScore, results: [] });
       return;
     }
 
     const observations = result?.observations || [];
-    if (!observations.length) {
-      res.json({ context: '', count: 0 });
-      return;
-    }
+    const results: any[] = observations.map((obs: any) => {
+      const score = typeof obs.score === 'number' ? obs.score : 0;
+      return {
+        id: obs.id,
+        title: obs.title || 'Untitled',
+        narrative: obs.narrative || '',
+        date: obs.created_at?.slice(0, 10) || '',
+        score: Math.round(score * 10000) / 10000,
+        threshold: minScore,
+        passed: score >= minScore,
+        injected: score >= minScore, // only injected if above threshold
+      };
+    });
 
+    const injected = results.filter((r: any) => r.injected);
     const lines: string[] = ['## Relevant Past Work (semantic match)\n'];
-    for (const obs of observations.slice(0, limit)) {
-      const date = obs.created_at?.slice(0, 10) || '';
-      lines.push(`### ${obs.title || 'Observation'} (${date})`);
-      if (obs.narrative) lines.push(obs.narrative);
+    for (const r of injected.slice(0, limit)) {
+      lines.push(`### ${r.title} (${r.date})`);
+      if (r.narrative) lines.push(r.narrative);
       lines.push('');
     }
 
-    res.json({ context: lines.join('\n'), count: observations.length });
+    res.json({
+      context: lines.join('\n'),
+      count: injected.length,
+      total: results.length,
+      threshold: minScore,
+      results,
+    });
   });
 
   private queryWithPlatformSource(req: Request): Record<string, any> {

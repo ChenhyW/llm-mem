@@ -9,6 +9,18 @@ interface TestResult {
   status: 'idle' | 'loading' | 'error' | 'empty' | 'ok';
   context: string;
   count: number;
+  total?: number;
+  threshold?: number;
+  results?: Array<{
+    id: number;
+    title: string;
+    narrative: string;
+    date: string;
+    score: number;
+    threshold: number;
+    passed: boolean;
+    injected: boolean;
+  }>;
   message?: string;
 }
 
@@ -16,7 +28,43 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [limit, setLimit] = useState('5');
+  const [threshold, setThreshold] = useState('0.75');
+  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<TestResult>({ status: 'idle', context: '', count: 0 });
+
+  // Load persisted threshold on mount; debounce-save on change
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(API_ENDPOINTS.SETTINGS);
+        if (r.ok) {
+          const d = await r.json();
+          const v = d['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE'];
+          if (v !== undefined) setThreshold(String(v));
+        }
+      } catch {}
+    })();
+  }, []);
+
+  const savedThresholdRef = React.useRef<string>(threshold);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => {
+    savedThresholdRef.current = threshold;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const val = savedThresholdRef.current;
+      setSaving(true);
+      try {
+        await fetch(API_ENDPOINTS.SETTINGS, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ LLM_MEM_SEMANTIC_INJECT_MIN_SCORE: val }),
+        });
+      } catch {}
+      setSaving(false);
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [threshold]);
 
   const handleTest = useCallback(async () => {
     if (!query.trim() || query.trim().length < 20) {
@@ -42,10 +90,10 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
       }
       const data = await resp.json();
       if (!data.context || data.context.trim().length === 0) {
-        setResult({ status: 'empty', context: '', count: data.count || 0, message: '未找到相关记忆' });
+        setResult({ status: 'empty', context: '', count: data.count || 0, total: data.total || 0, threshold: data.threshold, results: data.results || [], message: '未找到相关记忆' });
         return;
       }
-      setResult({ status: 'ok', context: data.context, count: data.count || 0 });
+      setResult({ status: 'ok', context: data.context, count: data.count || 0, total: data.total || 0, threshold: data.threshold, results: data.results || [] });
     } catch (err) {
       const message = err instanceof Error ? err.message : '请求失败';
       setResult({ status: 'error', context: '', count: 0, message });
@@ -103,6 +151,29 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
               value={limit}
               onChange={e => setLimit(e.target.value)}
               className="semantic-test-input semantic-test-input--small"
+            />
+          </div>
+          <div className="semantic-test-control">
+            <label>
+              最低分数
+              {saving && (
+                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 500, marginLeft: 4 }}>
+                  保存中…
+                </span>
+              )}
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value={threshold}
+              onChange={e => {
+                const v = Math.min(1, Math.max(0, parseFloat(e.target.value ?? '0'))).toFixed(2);
+                setThreshold(v);
+              }}
+              className="semantic-test-input semantic-test-input--small"
+              title="语义注入的最低相似度阈值（0-1），低于此分的记忆不会被注入"
             />
           </div>
         </div>
@@ -180,7 +251,7 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
               <circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" />
             </svg>
             <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>未找到相关记忆</span>
-            {result.count > 0 && <span style={{ fontSize: 12, opacity: 0.8 }}>({result.count} 条命中)</span>}
+            {(result.total ?? 0) > 0 && <span style={{ fontSize: 12, opacity: 0.8 }}>（共检索到 {result.total} 条，全部低于阈值 {result.threshold}）</span>}
           </div>
         </div>
       )}
@@ -192,12 +263,63 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              <span>命中 {result.count} 条相关记忆</span>
+              <span>命中 {result.count}/{result.total ?? result.count} 条（阈值 &ge; {result.threshold}）</span>
             </div>
             <span className="semantic-test-result-meta" style={{ cursor: 'pointer' }} onClick={clearResult}>
               × 清空
             </span>
           </div>
+          {(result.results ?? []).length > 0 && (
+            <div style={{ overflowX: 'auto', margin: '8px 0' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'inherit' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--color-border-secondary, #ddd)' }}>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 600, whiteSpace: 'nowrap' }}>标题</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>相似度</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 600, whiteSpace: 'nowrap' }}>阈值</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>通过</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 600, whiteSpace: 'nowrap' }}>注入</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.results!.map((r, i) => (
+                    <tr key={r.id} style={{
+                      borderBottom: '1px solid var(--color-border-secondary, #eee)',
+                      background: r.injected ? 'rgba(34,197,94,0.04)' : 'transparent',
+                    }}>
+                      <td style={{ padding: '5px 8px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={r.title}>
+                        {r.title}
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace' }}>
+                        {r.score.toFixed(4)}
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'right', fontFamily: 'monospace', color: '#888' }}>
+                        {r.threshold.toFixed(2)}
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '0 6px', borderRadius: 3, fontSize: 11, fontWeight: 500,
+                          background: r.passed ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.10)',
+                          color: r.passed ? '#22c55e' : '#ef4444',
+                        }}>
+                          {r.passed ? '✓' : '✗'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '5px 8px', textAlign: 'center' }}>
+                        <span style={{
+                          display: 'inline-block', padding: '0 6px', borderRadius: 3, fontSize: 11, fontWeight: 500,
+                          background: r.injected ? 'rgba(34,197,94,0.12)' : 'rgba(139,148,158,0.12)',
+                          color: r.injected ? '#22c55e' : '#8b949e',
+                        }}>
+                          {r.injected ? '✓' : '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <pre className="semantic-test-result-body">{result.context}</pre>
         </div>
       )}

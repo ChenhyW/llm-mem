@@ -4,6 +4,8 @@ import { formatDate } from '../utils/formatters';
 
 interface ObservationCardProps {
   observation: Observation;
+  vectorizedIds?: number[];
+  vectorModel?: string;
 }
 
 function stripProjectRoot(filePath: string): string {
@@ -25,7 +27,7 @@ function stripProjectRoot(filePath: string): string {
   return parts.length > 3 ? parts.slice(-3).join('/') : filePath;
 }
 
-export function ObservationCard({ observation }: ObservationCardProps) {
+export function ObservationCard({ observation, vectorizedIds, vectorModel }: ObservationCardProps) {
   const [showFacts, setShowFacts] = useState(false);
   const [showNarrative, setShowNarrative] = useState(false);
   const date = formatDate(observation.created_at_epoch);
@@ -116,6 +118,20 @@ export function ObservationCard({ observation }: ObservationCardProps) {
       {/* Metadata footer - id, date, and conditionally concepts/files when facts toggle is on */}
       <div className="card-meta">
         <span className="meta-date">#{observation.id} • {date}</span>
+        {vectorizedIds !== undefined && (
+          <span
+            title={vectorizedIds.includes(observation.id) ? '已向量化' : '未向量化'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+              background: vectorizedIds.includes(observation.id) ? 'rgba(34,197,94,0.12)' : 'rgba(139,148,158,0.12)',
+              color: vectorizedIds.includes(observation.id) ? '#22c55e' : '#8b949e',
+            }}
+          >
+            {vectorizedIds.includes(observation.id) ? '● 已向量化' : '○ 未向量化'}
+            {vectorizedIds.includes(observation.id) && vectorModel ? ` · ${vectorModel}` : ''}
+          </span>
+        )}
         {showFacts && (concepts.length > 0 || filesRead.length > 0 || filesModified.length > 0) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
             {concepts.map((concept: string, i: number) => (

@@ -433,6 +433,11 @@ export class SearchManager {
         const obsOptions = { ...options, type: obs_type, concepts, files, orderBy: 'relevance' };
         observations = this.sessionStore.getObservationsByIds(obsIds, obsOptions);
         observations.sort((a, b) => obsIds.indexOf(a.id) - obsIds.indexOf(b.id));
+        // Attach scores from the semantic search result
+        const scoreMap = new Map(recentMetadata.map(item => [item.id, item.score]));
+        for (const obs of observations) {
+          obs.score = scoreMap.get(obs.id) ?? 0;
+        }
       }
       if (sessionIds.length > 0) {
         sessions = this.sessionStore.getSessionSummariesByIds(sessionIds, {

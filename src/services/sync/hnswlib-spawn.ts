@@ -19,7 +19,7 @@ export async function spawnHnswHelper(
         ...filterEnv(envOverrides),
       },
       shell: false,
-      timeout: 90000,
+      timeout: 0,
     });
     let stdout = '';
     let stderr = '';

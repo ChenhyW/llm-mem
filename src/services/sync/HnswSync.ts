@@ -1,5 +1,7 @@
 import { spawnHnswHelper, getHnswDir } from './hnswlib-spawn.js';
 import { logger } from '../../utils/logger.js';
+import { DB_PATH, USER_SETTINGS_PATH } from '../../shared/paths.js';
+import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js';
 
 export type ChromaDocType = 'observation' | 'session_summary' | 'user_prompt';
 
@@ -51,7 +53,19 @@ export class HnswSync {
     _whereFilter?: Record<string, any>
   ): Promise<ChromaQueryResult> {
     try {
-      const result = await spawnHnswHelper(['search', this.hnswDir, query, '--k', String(limit)]);
+      const settings: Record<string, unknown> =
+        SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH) as any;
+      const model: string | undefined =
+        (settings.LLM_MEM_VECTOR_EMBEDDING_MODEL as string) ||
+        process.env.LLM_MEM_VECTOR_EMBEDDING_MODEL;
+      const ollamaUrl: string | undefined =
+        (settings.LLM_MEM_OLLAMA_URL as string) ||
+        process.env.LLM_MEM_OLLAMA_URL;
+      const env: Record<string, string | undefined> = {
+        EMBED_MODEL: model || 'nomic-embed-text',
+        OLLAMA_URL: ollamaUrl || process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
+      };
+      const result = await spawnHnswHelper(['search', this.hnswDir, query, '--k', String(limit)], env);
       if (result.exitCode !== 0) {
         logger.warn('HNSW_SYNC', 'search helper non-zero exit', { stderr: result.stderr });
         return { ids: [], distances: [], metadatas: [] };
@@ -175,15 +189,25 @@ export class HnswSync {
     const { runMetadataObservationsMigration } = await import('./migration.js');
     const res = runMetadataObservationsMigration(db);
     logger.info('HNSW_SYNC', 'migration', { created: res.created });
-    // rebuild the index after backfill
-    await HnswSync.buildIndex();
     logger.info('HNSW_SYNC', 'backfill check complete for all projects');
   }
 
   static async buildIndex(): Promise<void> {
     try {
-      const { DB_PATH } = await import('../../shared/paths.js');
-      const result = await spawnHnswHelper(['build', DB_PATH, getHnswDir()]);
+      const settings: Record<string, unknown> =
+        SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH) as any;
+      const model: string | undefined =
+        (settings.LLM_MEM_VECTOR_EMBEDDING_MODEL as string) ||
+        process.env.LLM_MEM_VECTOR_EMBEDDING_MODEL;
+      const ollamaUrl: string | undefined =
+        (settings.LLM_MEM_OLLAMA_URL as string) ||
+        process.env.LLM_MEM_OLLAMA_URL;
+      const env: Record<string, string | undefined> = {
+        EMBED_MODEL: model || 'nomic-embed-text',
+        OLLAMA_URL: ollamaUrl || process.env.OLLAMA_URL || 'http://127.0.0.1:11434',
+      };
+      logger.info('HNSW_SYNC', 'building vector index', { env });
+      const result = await spawnHnswHelper(['build', DB_PATH, getHnswDir()], env);
       if (result.exitCode !== 0) {
         logger.warn('HNSW_SYNC', 'index build failed', { stderr: result.stderr });
         return;
@@ -229,9 +253,46 @@ export class HnswSync {
   private async writeToMetaObs(row: Record<string, unknown>): Promise<void> {
     try {
       const { DB_PATH } = await import('../../shared/paths.js');
-      const r = await spawnHnswHelper(['sync', DB_PATH, '--row', JSON.stringify(row)]);
+
+      const settings: Record<string, unknown> =
+        SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH) as any;
+      const env: Record<string, string | undefined> = {
+        EMBED_MODEL:
+          (settings.LLM_MEM_VECTOR_EMBEDDING_MODEL as string) ||
+          process.env.LLM_MEM_VECTOR_EMBEDDING_MODEL ||
+          'nomic-embed-text',
+        OLLAMA_URL:
+          (settings.LLM_MEM_OLLAMA_URL as string) ||
+          process.env.LLM_MEM_OLLAMA_URL ||
+          'http://127.0.0.1:11434',
+      };
+
+      const r = await spawnHnswHelper(
+        [
+          'sync',
+          DB_PATH,
+          '--row',
+          JSON.stringify(row),
+          '--hnsw-dir',
+          this.hnswDir,
+        ],
+        env,
+      );
       if (r.exitCode !== 0) {
         logger.warn('HNSW_SYNC', 'sync row failed', { stderr: r.stderr });
+        return;
+      }
+      try {
+        const result = JSON.parse(r.stdout);
+        if (result.vectorized === false && result.vector_error) {
+          // 向量化失败，记录原因但不阻塞记忆写入
+          logger.warn('HNSW_SYNC', 'embedding failed on record', {
+            id: result.id,
+            reason: result.vector_error,
+          });
+        }
+      } catch (_) {
+        // JSON parse of stdout not essential; log is enough
       }
     } catch (err) {
       logger.warn('HNSW_SYNC', 'sync row threw', {}, err instanceof Error ? err : new Error(String(err)));

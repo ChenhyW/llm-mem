@@ -12,10 +12,16 @@ import { validateBody } from '../middleware/validateBody.js';
 import { SettingsDefaultsManager } from '../../../../shared/SettingsDefaultsManager.js';
 import { clearPortCache } from '../../../../shared/worker-utils.js';
 import { snapshotDependencyHealth } from '../../../../shared/dependency-health.js';
-import { parseJsonWithBom, writeJsonFileAtomic } from '../../../../shared/atomic-json.js';
+import { parseJsonWithBom, writeJsonFileAtomic, readJsonFileWithBom } from '../../../../shared/atomic-json.js';
+import { spawnHnswHelper, getHnswDir } from '../../../sync/hnswlib-spawn.js';
+import { promises as fs } from 'fs';
 
 const toggleMcpSchema = z.object({
   enabled: z.boolean(),
+}).passthrough();
+
+const vectorRebuildSchema = z.object({
+  force: z.boolean().optional(),
 }).passthrough();
 
 export class SettingsRoutes extends BaseRouteHandler {
@@ -29,6 +35,10 @@ export class SettingsRoutes extends BaseRouteHandler {
     app.get('/api/settings', this.handleGetSettings.bind(this));
     app.post('/api/settings', this.handleUpdateSettings.bind(this));
     app.get('/api/settings/dependency-health', this.handleGetDependencyHealth.bind(this));
+
+    app.post('/api/vector/rebuild', validateBody(vectorRebuildSchema), this.handleVectorRebuild.bind(this));
+    app.get('/api/vector/rebuild/status', this.handleVectorRebuildStatus.bind(this));
+    app.get('/api/vector/stats', this.handleVectorStats.bind(this));
 
     app.get('/api/mcp/status', this.handleGetMcpStatus.bind(this));
     app.post('/api/mcp/toggle', validateBody(toggleMcpSchema), this.handleToggleMcp.bind(this));
@@ -44,6 +54,150 @@ export class SettingsRoutes extends BaseRouteHandler {
   private handleGetDependencyHealth = this.wrapHandler((_req: Request, res: Response): void => {
     res.json(snapshotDependencyHealth());
   });
+
+  private handleVectorRebuild = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
+    const settingsPath = paths.settings();
+    const settings = SettingsDefaultsManager.loadFromFile(settingsPath);
+    const model = settings.LLM_MEM_VECTOR_EMBEDDING_MODEL
+      ?? SettingsDefaultsManager.getAllDefaults().LLM_MEM_VECTOR_EMBEDDING_MODEL;
+    const ollamaUrl = settings.LLM_MEM_VECTOR_EMBEDDING_MODEL
+      ? settings.LLM_MEM_OLLAMA_URL ?? SettingsDefaultsManager.getAllDefaults().LLM_MEM_OLLAMA_URL
+      : SettingsDefaultsManager.getAllDefaults().LLM_MEM_OLLAMA_URL;
+    const modelDim = this.getModelDimension(model);
+    const hnswDir = getHnswDir();
+    const { DATA_DIR, DB_PATH } = await import('../../../../shared/paths.js');
+    const statusPath = path.join(DATA_DIR, 'vector-rebuild-status.json');
+    const started = Date.now();
+
+    const writeStatus = (status: 'running' | 'done' | 'failed', payload?: object) => {
+      const out = { status, started_at: started, ...payload };
+      try { writeJsonFileAtomic(statusPath, out); } catch { /* ignore */ }
+    };
+
+    try {
+      // --- synchronous pre-flight: clear old index + write "running" ---
+      const existing = await this.listHnswIndexFiles(hnswDir);
+      const removed = existing.length;
+      if (existing.length > 0) {
+        logger.info('WORKER', 'Clearing existing hnsw index files before rebuild', { files: existing, model });
+        await Promise.all(existing.map(f => fs.unlink(f).catch((e) => {
+          logger.warn('WORKER', 'Failed to remove index file', { file: f, error: String(e) });
+        })));
+      }
+      writeStatus('running', { model, removed });
+
+      // --- fire-and-forget: spawn the slow build in the background ---
+      const env: Record<string, string> = { EMBED_MODEL: model, EMBED_DIM: modelDim, OLLAMA_URL: ollamaUrl };
+      const startedAt = Date.now();
+
+      // Run spawnHnswHelper in background; once done, persist final status.
+      spawnHnswHelper(['build', DB_PATH, hnswDir], env).then((result) => {
+        const duration = Date.now() - startedAt;
+        if (result.exitCode !== 0) {
+          logger.warn('WORKER', 'vector index build failed', { stderr: result.stderr, model });
+          writeStatus('failed', { model, error: result.stderr || 'build failed', duration_ms: duration });
+          return;
+        }
+        let elements = 0;
+        try {
+          const out = JSON.parse(result.stdout.trim()) as { built: boolean; elements: number };
+          if (out.built) elements = out.elements;
+        } catch { /* ignore parse errors */ }
+        logger.info('WORKER', 'Vector index rebuilt', { model, elements, duration });
+        writeStatus('done', { model, elements, duration_ms: duration });
+      }).catch((err) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error('WORKER', 'Vector index rebuild threw', { model }, new Error(msg));
+        writeStatus('failed', { model, error: msg, duration_ms: Date.now() - startedAt });
+      });
+
+      res.json({ success: true, model, removed, message: 'Rebuild started in background' });
+    } catch (err) {
+      const normalizedError = err instanceof Error ? err : new Error(String(err));
+      logger.error('WORKER', 'Vector index rebuild pre-flight failed', { model }, normalizedError);
+      res.status(500).json({
+        success: false,
+        model,
+        error: normalizedError.message,
+      });
+    }
+  });
+
+  /** Read the latest rebuild status written by handleVectorRebuild. */
+  private handleVectorRebuildStatus = this.wrapHandler((_req: Request, res: Response): void => {
+    const { DATA_DIR } = require('../../../../shared/paths.js');
+    const statusPath = path.join(DATA_DIR, 'vector-rebuild-status.json');
+    if (!existsSync(statusPath)) {
+      res.json({ status: 'idle' });
+      return;
+    }
+    try {
+      const status = readJsonFileWithBom(statusPath);
+      res.json(status);
+    } catch {
+      res.json({ status: 'failed', error: 'could not read status file' });
+    }
+  });
+
+  /** Return vector index stats: total indexed, model, dim, indexed sqlite_ids. */
+  private handleVectorStats = this.wrapHandler((_req: Request, res: Response): void => {
+    try {
+      const settingsPath = paths.settings();
+      const settings = SettingsDefaultsManager.loadFromFile(settingsPath);
+      const model = settings.LLM_MEM_VECTOR_EMBEDDING_MODEL
+        ?? SettingsDefaultsManager.getAllDefaults().LLM_MEM_VECTOR_EMBEDDING_MODEL;
+      const hnswDir = getHnswDir();
+      const idMapPath = path.join(hnswDir, 'id-map.json');
+
+      if (!existsSync(idMapPath)) {
+        res.json({ indexed: 0, model, indexed_ids: [], healthy: false });
+        return;
+      }
+
+      const idMap = readJsonFileWithBom<Record<string, any>>(idMapPath);
+      const ids = Object.values(idMap).map((v: any) => v.sqlite_id as number);
+      res.json({
+        indexed: ids.length,
+        model,
+        indexed_ids: ids,
+        healthy: true,
+      });
+    } catch (err) {
+      res.json({
+        indexed: 0,
+        model: 'unknown',
+        indexed_ids: [],
+        healthy: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  });
+
+  /**
+   * Embedding dimensions for the models we offer. hnswlib needs the dimension
+   * to match what the embedding model emits; wrong dimension -> garbage vectors.
+   */
+  private getModelDimension(model: string): string {
+    const lower = model.toLowerCase();
+    if (lower.includes('qwen')) return '1024';
+    if (lower.includes('bge')) return '1024';
+    if (lower.includes('mxbai')) return '1024';
+    if (lower.includes('minilm')) return '384';
+    if (lower.includes('snowflake')) return '1024';
+    if (lower.includes('nomic')) return '768';
+    return '';
+  }
+
+  private async listHnswIndexFiles(dir: string): Promise<string[]> {
+    try {
+      const files = await fs.readdir(dir);
+      return files
+        .filter(f => f === 'index.bin' || f === 'vectors.npy' || f === 'id-map.json' || f === 'id_map.json')
+        .map(f => dir + '/' + f);
+    } catch {
+      return [];
+    }
+  }
 
   private handleUpdateSettings = this.wrapHandler((req: Request, res: Response): void => {
     const validation = this.validateSettings(req.body);
@@ -103,6 +257,7 @@ export class SettingsRoutes extends BaseRouteHandler {
       'LLM_MEM_CONTEXT_SESSION_COUNT',
       'LLM_MEM_CONTEXT_SHOW_LAST_SUMMARY',
       'LLM_MEM_CONTEXT_SHOW_LAST_MESSAGE',
+      'LLM_MEM_OUTPUT_LANGUAGE',
       'LLM_MEM_FOLDER_CLAUDEMD_ENABLED',
       'LLM_MEM_OLLAMA_URL',
       'LLM_MEM_VECTOR_EMBEDDING_MODEL',
@@ -115,6 +270,7 @@ export class SettingsRoutes extends BaseRouteHandler {
       'LLM_MEM_EXCLUDED_PROJECTS',
       'LLM_MEM_SEMANTIC_INJECT',
       'LLM_MEM_SEMANTIC_INJECT_LIMIT',
+      'LLM_MEM_SEMANTIC_INJECT_MIN_SCORE',
       'LLM_MEM_TELEGRAM_ENABLED',
       'LLM_MEM_TELEGRAM_BOT_TOKEN',
       'LLM_MEM_TELEGRAM_CHAT_ID',

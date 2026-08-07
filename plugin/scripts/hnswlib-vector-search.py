@@ -170,6 +170,29 @@ def _bin_path(hnsw_dir: str) -> str:
     return os.path.join(hnsw_dir, "index.bin")
 
 
+def _infer_dim(hnsw_dir: str) -> int:
+    """Return the dimension of the existing on-disk index, or 0 if none."""
+    vp = _vec_path(hnsw_dir)
+    mp = _id_map_path(hnsw_dir)
+    if not (os.path.exists(vp) and os.path.exists(mp)):
+        return 0
+    try:
+        m = load_id_map(hnsw_dir)
+        n = len(m)
+        data = open(vp, "rb").read()
+        arr = np.frombuffer(data, dtype=np.float32)
+        if n == 0 or arr.size == 0:
+            return 0
+        return int(arr.size // n)
+    except Exception:
+        return 0
+
+
+def _pick_dim(hnsw_dir: str) -> int:
+    """Return the actual dimension of the existing index, or 0 if none."""
+    return _infer_dim(hnsw_dir)
+
+
 def _save_vector_bin(hnsw_dir: str, arr: np.ndarray) -> None:
     os.makedirs(hnsw_dir, exist_ok=True)
     final = _vec_path(hnsw_dir)
@@ -217,6 +240,62 @@ def load_id_map(hnsw_dir: str) -> dict[int, dict]:
     return {int(k): v for k, v in m.items()}
 
 
+def _rebuild_index_on_disk(hnsw_dir: str, vecs: np.ndarray, meta_map: dict[int, dict]) -> None:
+    """Save vectors + id-map, then rebuild the in-memory hnsw graph (sanity)."""
+    _save_vector_bin(hnsw_dir, vecs)
+    save_id_map(hnsw_dir, meta_map)
+    # Rebuild graph in-memory to ensure the persisted index is healthy.
+    index = hnswlib.Index(space="cosine", dim=vecs.shape[1])
+    index.init_index(
+        max_elements=max(40, len(vecs) + 10000),
+        ef_construction=200,
+        M=16,
+        random_seed=42,
+    )
+    index.set_ef(40)
+    _build_index_in_memory(index, vecs, list(range(len(vecs))))
+
+
+def append_vector_to_index(
+    hnsw_dir: str,
+    meta: dict,
+    vec: np.ndarray,
+) -> None:
+    """Append a single vector + metadata entry to the hnsw index on disk.
+
+    Strategy: load existing vectors.npy + id-map, append one row, then
+    _rebuild_index_on_disk the whole thing.  Full rebuild of a 247-element
+    index is negligible (~5ms) compared with the Ollama embed call, and it
+    keeps id-map labels contiguous (0..N-1) so the search path never breaks.
+    """
+    os.makedirs(hnsw_dir, exist_ok=True)
+
+    # Load existing state.  If no index yet, start fresh.
+    id_map_exists = os.path.exists(_id_map_path(hnsw_dir))
+    vecs_exist = os.path.exists(_vec_path(hnsw_dir))
+    if id_map_exists and vecs_exist:
+        meta_map = load_id_map(hnsw_dir)
+        existing_vecs = _load_vector_bin(hnsw_dir)
+        # Re-dimension in case the new vector has a different dim (e.g. model change).
+        if existing_vecs.shape[1] != vec.shape[0]:
+            existing_vecs = np.full(
+                (existing_vecs.shape[0], vec.shape[0]), 0.0, dtype=np.float32
+            )
+        new_label = len(meta_map)
+    else:
+        meta_map = {}
+        existing_vecs = np.empty((0, vec.shape[0]), dtype=np.float32)
+        new_label = 0
+
+    # Store metadata for the new element.
+    meta_map[new_label] = meta
+
+    # Append the vector.
+    new_vecs = np.vstack([existing_vecs, vec])
+
+    _rebuild_index_on_disk(hnsw_dir, new_vecs, meta_map)
+
+
 def is_healthy(hnsw_dir: str, dim: int = EMBED_DIM) -> dict:
     vecp = _vec_path(hnsw_dir)
     mapp = _id_map_path(hnsw_dir)
@@ -248,7 +327,6 @@ def is_healthy(hnsw_dir: str, dim: int = EMBED_DIM) -> dict:
 def cmd_build(args):
     db_path = args.db_path
     hnsw_dir = args.hnsw_dir
-    dim = args.dim or EMBED_DIM
     limit = args.limit
 
     ensure_table(db_path)
@@ -265,9 +343,13 @@ def cmd_build(args):
             except Exception:
                 e = None
             embeddings.append(e)
+        # Infer dim from the first non-null embedding (authoritative: the model's actual output).
+        actual_dim = next((len(e) for e in embeddings if e is not None), _pick_dim(hnsw_dir) or EMBED_DIM)
     else:
+        actual_dim = _pick_dim(hnsw_dir) or EMBED_DIM
         for _ in doc_texts:
-            embeddings.append(np.random.default_rng(42).random(dim).tolist())
+            embeddings.append(np.random.default_rng(42).random(actual_dim).tolist())
+    dim = actual_dim
 
     # Keep only rows with a usable vector.
     kept = [
@@ -326,7 +408,11 @@ def cmd_search(args):
     hnsw_dir = args.hnsw_dir
     query = args.query
     k = min(args.k or 20, 100)
-    dim = args.dim or EMBED_DIM
+    dim = _pick_dim(hnsw_dir)
+
+    if dim <= 0:
+        print(json.dumps({"results": [], "error": "no index found to infer dimension"}))
+        return
 
     health = is_healthy(hnsw_dir, dim)
     if not health["ok"]:
@@ -339,6 +425,7 @@ def cmd_search(args):
         return
 
     arr = _load_vector_bin(hnsw_dir)
+    k = min(k, len(arr))
     index = hnswlib.Index(space="cosine", dim=dim)
     index.init_index(
         max_elements=max(40, len(arr)),
@@ -356,7 +443,6 @@ def cmd_search(args):
         meta = id_map.get(int(label))
         if not meta:
             continue
-        # cosine distance -> score (closer distance = higher score)
         distance = float(distk[0][rank])
         score = round(float(1.0 - distance), 4)
         out.append(
@@ -368,18 +454,56 @@ def cmd_search(args):
             }
         )
 
-    print(json.dumps({"results": out}))
+    print(json.dumps({"results": out, "dim": dim}))
 
 
 def cmd_health(args):
-    print(json.dumps(is_healthy(args.hnsw_dir, args.dim or EMBED_DIM)))
+    dim = _pick_dim(args.hnsw_dir) or EMBED_DIM
+    print(json.dumps(is_healthy(args.hnsw_dir, dim)))
 
 
 def cmd_sync(args):
+    """Write a row into metadata_observations and append its embedding to the
+    hnsw index.
+
+    Embedding is done *here* so a fresh observation is searchable immediately;
+    we never need a full rebuild except when the user explicitly requests it
+    (e.g. after changing the embedding model).
+    """
+    hnsw_dir = getattr(args, "hnsw_dir", None)
     ensure_table(args.db_path)
     row = json.loads(args.row)
     upsert_row(args.db_path, row)
-    print(json.dumps({"synced": True, "id": row.get("id")}))
+    out = {"synced": True, "id": row.get("id")}
+
+    if hnsw_dir:
+        text = row.get("document", "")
+        try:
+            vec = embed_one(text)
+            expected_dim = _pick_dim(hnsw_dir)
+            # If there's no existing index yet, accept whatever dim the model returns.
+            if vec is None or (expected_dim > 0 and len(vec) != expected_dim):
+                out["vectorized"] = False
+                out["vector_error"] = (
+                    f"bad embedding length {len(vec or [])} vs expected dim {expected_dim}"
+                )
+            else:
+                meta = {
+                    "id": int(row.get("id", 0)),
+                    "sqlite_id": int(row["sqlite_id"]),
+                    "doc_type": row.get("doc_type"),
+                    "field_type": row.get("field_type"),
+                    "project": row.get("project"),
+                    "platform_source": row.get("platform_source"),
+                    "created_at_epoch": int(row.get("created_at_epoch") or 0),
+                }
+                append_vector_to_index(hnsw_dir, meta, np.array(vec, dtype=np.float32))
+                out["vectorized"] = True
+        except Exception as e:
+            out["vectorized"] = False
+            out["vector_error"] = repr(e)
+
+    print(json.dumps(out))
 
 
 def main():
@@ -408,6 +532,7 @@ def main():
     syn = sub.add_parser("sync")
     syn.add_argument("db_path")
     syn.add_argument("--row", required=True)
+    syn.add_argument("--hnsw-dir", default=None)
     syn.set_defaults(func=cmd_sync)
 
     a = p.parse_args()

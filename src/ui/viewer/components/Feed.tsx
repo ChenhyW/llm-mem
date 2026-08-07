@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import { Observation, Summary, UserPrompt, FeedItem } from '../types';
 import { ObservationCard } from './ObservationCard';
 import { SummaryCard } from './SummaryCard';
@@ -19,6 +19,15 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
+
+  // Vector index stats: which observation sqlite_ids are vectorized
+  const [vectorStats, setVectorStats] = useState<{ indexed_ids: number[]; model: string } | null>(null);
+  useEffect(() => {
+    fetch('/api/vector/stats')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setVectorStats({ indexed_ids: d.indexed_ids || [], model: d.model || 'unknown' }); })
+      .catch(() => {});
+  }, [observations.length]);
 
   useEffect(() => {
     onLoadMoreRef.current = onLoadMore;
@@ -65,7 +74,7 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
         {items.map(item => {
           const key = `${item.itemType}-${item.id}`;
           if (item.itemType === 'observation') {
-            return <ObservationCard key={key} observation={item} />;
+            return <ObservationCard key={key} observation={item} vectorizedIds={vectorStats?.indexed_ids} vectorModel={vectorStats?.model} />;
           } else if (item.itemType === 'summary') {
             return <SummaryCard key={key} summary={item} />;
           } else {

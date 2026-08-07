@@ -186,7 +186,7 @@ export class SettingsDefaultsManager {
     LLM_MEM_AUTH_MODE: 'api-key',
     LLM_MEM_RUNTIME: 'worker',
     LLM_MEM_OLLAMA_URL: 'http://127.0.0.1:11434',       // Ollama server base URL for vector search
-    LLM_MEM_VECTOR_EMBEDDING_MODEL: 'nomic-embed-text', // Embedding model used by hnswlib
+    LLM_MEM_VECTOR_EMBEDDING_MODEL: 'qwen3-embedding:0.6b', // Embedding model used by hnswlib (multi-language, 1024-dim)
     LLM_MEM_DISABLE_VECTOR_SEARCH: 'false',              // 'true' to disable vector/hnsw search
     // Phase 1a (cmem-sdk rename): canonical server settings keys. Hooks read
     // these first; the legacy `*_BETA_*` defaults below remain so existing
