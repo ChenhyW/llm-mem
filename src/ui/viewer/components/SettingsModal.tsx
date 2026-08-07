@@ -217,12 +217,13 @@ export function SettingsModal({
         if (cancelled) return;
         if (data.status === 'running') {
           setIsRebuilding(true);
-          const parts = [`正在重算向量…（${data.vectorized ?? '?'}/${data.total ?? '?'}`];
+          const processed = (data.vectorized ?? 0) + (data.failed ?? 0);
+          const parts = [`正在重算向量…（${processed}/${data.total ?? '?'}`];
           if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
           parts.push('）');
           setRebuildStatus(parts.join(''));
           timer = setInterval(poll, 2000);
-        } else if (data.status === 'done' || data.vectorized === data.total) {
+        } else if (data.status === 'done' || (data.vectorized > 0 && data.vectorized === data.total)) {
           setIsRebuilding(false);
           const parts = ['重算完成，已重建 ' + (data.vectorized ?? '?') + ' 条'];
           if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
@@ -250,9 +251,6 @@ export function SettingsModal({
       } else if (data.status === 'running') {
         setIsRebuilding(true);
         setRebuildStatus('向量重算已在运行中');
-      } else if (data.status === 'skipped') {
-        setIsRebuilding(false);
-        setRebuildStatus(data.message || '索引已存在，无需重建');
       } else {
         setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
       }

@@ -562,25 +562,6 @@ export class DataRoutes extends BaseRouteHandler {
       res.json({ status: 'running', message: '向量重算正在进行中' });
       return;
     }
-    // Quick health check: if the index already has entries, skip rebuild.
-    try {
-      const { HnswSync } = await import('../../../sync/HnswSync.js');
-      const { accessSync, constants } = await import('fs');
-      const { join } = await import('path');
-      const { homedir } = await import('os');
-      const dataDir = process.env.LLM_MEM_DATA_DIR || join(homedir(), '.llm-mem');
-      const hnswDir = join(dataDir, 'hnswlib');
-      try {
-        accessSync(join(hnswDir, 'vectors.npy'), constants.R_OK);
-        accessSync(join(hnswDir, 'id-map.json'), constants.R_OK);
-        const idMap = JSON.parse(require('fs').readFileSync(join(hnswDir, 'id-map.json'), 'utf-8'));
-        const entries = Object.keys(idMap).length;
-        if (entries > 0) {
-          res.json({ status: 'skipped', message: `索引已存在 ${entries} 条，无需重建。如需强制重建，请先在数据目录中删除 hnswlib/ 目录。` });
-          return;
-        }
-      } catch { /* files missing → proceed with rebuild */ }
-    } catch { /* ignore health check errors */ }
     rebuildStatus = { status: 'running', startedAt: Date.now() };
     res.json({ status: 'started', message: '向量重算已启动' });
     // Fire-and-forget
