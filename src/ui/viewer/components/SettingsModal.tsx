@@ -355,25 +355,24 @@ export function SettingsModal({
                 onChange={v => set('LLM_MEM_OLLAMA_URL', v)} />
             </Field>
             <Field label="嵌入模型" tooltip="用于 hnswlib 向量检索的嵌入模型名。切换后建议点击下方「全量重算向量」用新模型重建索引。（需重启生效）">
-              {isCustomEmbed ? (
-                <TextField value={embedModel === '__custom__' ? '' : embedModel}
-                  onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)} />
-              ) : (
-                <SelectField
-                  value={embedModel}
-                  onChange={handleEmbedSelect}
-                  options={[
-                    { value: 'qwen3-embedding:0.6b', label: 'qwen3-embedding:0.6b（多语言，推荐）' },
-                    { value: 'nomic-embed-text', label: 'nomic-embed-text（英文）' },
-                    { value: 'bge-m3', label: 'bge-m3（多语言）' },
-                    { value: 'multilingual-e5-large', label: 'multilingual-e5-large（多语言）' },
-                    { value: '__custom__', label: '自定义...' },
-                  ]}
-                />
-              )}
+              <SelectField
+                value={isCustomEmbed ? '__custom__' : embedModel}
+                onChange={handleEmbedSelect}
+                options={[
+                  { value: 'qwen3-embedding:0.6b', label: 'qwen3-embedding:0.6b（多语言，推荐）' },
+                  { value: 'nomic-embed-text', label: 'nomic-embed-text（英文）' },
+                  { value: 'bge-m3', label: 'bge-m3（多语言）' },
+                  { value: 'multilingual-e5-large', label: 'multilingual-e5-large（多语言）' },
+                  { value: '__custom__', label: '自定义...' },
+                ]}
+              />
               {isCustomEmbed && (
-                <div className="settings-field-desc" style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                  当前自定义模型：「{embedModel === '__custom__' ? '' : embedModel}」，通过下拉选择预设可直接切换。
+                <div style={{ marginTop: 6 }}>
+                  <TextField value={embedModel === '__custom__' ? '' : embedModel}
+                    onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)} />
+                  <div className="settings-field-desc" style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                    当前自定义模型：「{embedModel === '__custom__' ? '' : embedModel}」，通过上方下拉选择预设可直接切换。
+                  </div>
                 </div>
               )}
             </Field>
