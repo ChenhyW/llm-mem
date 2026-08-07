@@ -557,6 +557,42 @@
     .settings-modal-footer .settings-status {
       margin-right: auto;
     }
+    .settings-modal-footer button {
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .settings-modal-footer button:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .btn-secondary {
+      background: var(--color-bg-tertiary);
+      color: var(--color-text-primary);
+      border-color: var(--color-border-primary) !important;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: var(--color-bg-card-hover);
+    }
+    .btn-primary {
+      background: var(--color-bg-button, #0969da);
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--color-bg-button-hover, #1177e6);
+    }
+    .btn-warning {
+      background: var(--color-accent-summary, #9a6700);
+      color: #fff;
+    }
+    .btn-warning:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
 
     .settings-tabs { display: flex; gap: 6px; padding: 10px 20px 0 20px; border-bottom: 1px solid var(--color-border-secondary); background: var(--color-bg-secondary); overflow-x: auto; flex-shrink: 0; }
 
@@ -2112,6 +2148,7 @@
       display: flex;
       flex-direction: column;
       box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      position: relative;
       animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       overflow: hidden;
     }
@@ -2194,6 +2231,18 @@
       color: var(--color-text-secondary);
       transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       padding: 0;
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      z-index: 10;
+    }
+    .modal-close-btn:hover {
+      background: var(--color-bg-tertiary);
+      color: var(--color-text-primary);
+      border-color: var(--color-border-hover);
+    }
+    .modal-close-btn:active {
+      transform: scale(0.95);
     }
 
     .modal-close-btn:hover {

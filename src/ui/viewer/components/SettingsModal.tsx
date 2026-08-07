@@ -243,7 +243,7 @@ export function SettingsModal({
                 ]}
               />
             </Field>
-            <Field label="数据目录" tooltip="llm-mem 的 SQLite 数据库、日志等数据存放位置。默认 ~/.llm-mem，留空即用默认值。">
+            <Field label="数据目录" tooltip="llm-mem 的 SQLite 数据库、日志等数据存放位置。默认 ~/.llm-mem，留空即用默认值。（需重启生效）">
               <TextField value={draft.LLM_MEM_DATA_DIR ?? ''} placeholder="~/.llm-mem"
                 onChange={v => set('LLM_MEM_DATA_DIR', v)} />
             </Field>
@@ -263,7 +263,7 @@ export function SettingsModal({
                 ]}
               />
             </Field>
-            <Field label="输出语言" tooltip="LLM 生成观察摘要时使用的语言">
+            <Field label="输出语言" tooltip="LLM 生成观察摘要时使用的语言。zh 输出中文摘要，en 输出英文摘要。（需重启生效）">
               <SelectField
                 value={draft.LLM_MEM_OUTPUT_LANGUAGE ?? 'zh'}
                 onChange={v => set('LLM_MEM_OUTPUT_LANGUAGE', v)}
@@ -350,11 +350,11 @@ export function SettingsModal({
         };
         return (
           <CollapsibleSection title="向量搜索 (Ollama + hnswlib)">
-            <Field label="Ollama 地址 (OLLAMA_URL)" tooltip="例如 http://192.168.1.2:11434">
+            <Field label="Ollama 地址 (OLLAMA_URL)" tooltip="运行嵌入模型的 Ollama 服务地址，例如 http://192.168.1.2:11434。用于把观察记录编码成向量以支持语义检索。（需重启生效）">
               <TextField value={draft.LLM_MEM_OLLAMA_URL ?? DEFAULT_SETTINGS.LLM_MEM_OLLAMA_URL}
                 onChange={v => set('LLM_MEM_OLLAMA_URL', v)} />
             </Field>
-            <Field label="嵌入模型" tooltip="用于 hnswlib 向量检索的嵌入模型名">
+            <Field label="嵌入模型" tooltip="用于 hnswlib 向量检索的嵌入模型名。切换后建议点击下方「全量重算向量」用新模型重建索引。（需重启生效）">
               {isCustomEmbed ? (
                 <TextField value={embedModel === '__custom__' ? '' : embedModel}
                   onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)} />
@@ -397,15 +397,15 @@ export function SettingsModal({
         return (
           <>
             <CollapsibleSection title="上下文注入">
-              <Field label="引用观察数" tooltip="每次注入上下文时最多检索的相关观察记录数量（1-200）。数量越大背景信息越多，但消耗的 token 也越多。默认 50 条一般已够用。">
+              <Field label="引用观察数" tooltip="每次注入上下文时最多检索的相关观察记录数量（1-200）。数量越大背景信息越多，但消耗的 token 也越多。默认 50 条一般已够用。（无需重启，下次注入生效）">
                 <TextField value={draft.LLM_MEM_CONTEXT_OBSERVATIONS ?? '50'}
                   onChange={v => set('LLM_MEM_CONTEXT_OBSERVATIONS', v)} />
               </Field>
-              <Field label="全文引用条数" tooltip="在注入的观察记录中，有多少条会带上完整的叙述文本（默认 0 即只注入标题）。打开后会大幅增加注入的 token 量，适合希望模型看到更多细节时使用。">
+              <Field label="全文引用条数" tooltip="在注入的观察记录中，有多少条会带上完整的叙述文本（默认 0 即只注入标题）。打开后会大幅增加注入的 token 量，适合希望模型看到更多细节时使用。（无需重启，下次注入生效）">
                 <TextField value={draft.LLM_MEM_CONTEXT_FULL_COUNT ?? '0'}
                   onChange={v => set('LLM_MEM_CONTEXT_FULL_COUNT', v)} />
               </Field>
-              <Field label="全文引用字段" tooltip="决定全文引用时使用观察记录的哪个字段。narrative 是模型生成的叙事性摘要（推荐，信息量丰富）；facts 是结构化事实字段（适合需要精确数据时）。">
+              <Field label="全文引用字段" tooltip="决定全文引用时使用观察记录的哪个字段。narrative 是模型生成的叙事性摘要（推荐，信息量丰富）；facts 是结构化事实字段（适合需要精确数据时）。（无需重启，下次注入生效）">
                 <SelectField
                   value={draft.LLM_MEM_CONTEXT_FULL_FIELD ?? 'narrative'}
                   onChange={v => set('LLM_MEM_CONTEXT_FULL_FIELD', v)}
@@ -415,7 +415,7 @@ export function SettingsModal({
                   ]}
                 />
               </Field>
-              <Field label="引用会话数" tooltip="注入时回看最近多少个会话的时间窗口。默认 10，即只从最近 10 个会话里选观察记录；设大些可看到更早的工作，设小些更聚焦最近。">
+              <Field label="引用会话数" tooltip="注入时回看最近多少个会话的时间窗口。默认 10，即只从最近 10 个会话里选观察记录；设大些可看到更早的工作，设小些更聚焦最近。（无需重启，下次注入生效）">
                 <TextField value={draft.LLM_MEM_CONTEXT_SESSION_COUNT ?? '10'}
                   onChange={v => set('LLM_MEM_CONTEXT_SESSION_COUNT', v)} />
               </Field>
@@ -424,11 +424,11 @@ export function SettingsModal({
               <ToggleField label="启用语义注入"
                 value={draft.LLM_MEM_SEMANTIC_INJECT ?? 'false'}
                 onChange={v => set('LLM_MEM_SEMANTIC_INJECT', v)} />
-              <Field label="注入条数" tooltip="每次语义注入时最多拼入的相关记忆条数（1-20）。默认 5，数量越多信息越丰富但提示词越长。">
+              <Field label="注入条数" tooltip="每次语义注入时最多拼入的相关记忆条数（1-20）。默认 5，数量越多信息越丰富但提示词越长。（无需重启，下次注入生效）">
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_LIMIT ?? '5'}
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_LIMIT', v)} />
               </Field>
-              <Field label="最低匹配分数" tooltip="语义注入时只返回分数 ≥ 此值的记忆（0-1）。默认 0.75，值越高结果越精准但可能无匹配；设 0 关闭过滤。">
+              <Field label="最低匹配分数" tooltip="语义注入时只返回分数 ≥ 此值的记忆（0-1）。默认 0.75，值越高结果越精准但可能无匹配；设 0 关闭过滤。（无需重启，下次注入生效）">
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_SCORE ?? '0.75'}
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_SCORE', v)} />
               </Field>
@@ -490,12 +490,12 @@ export function SettingsModal({
   return (
     <div className="modal-backdrop" onClick={handleCancel}>
       <div className="context-settings-modal" onClick={e => e.stopPropagation()}>
+        <button className="modal-close-btn" onClick={handleCancel} title="关闭" aria-label="关闭">×</button>
         <div className="settings-modal-header">
           <div>
             <h2>设置</h2>
             <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>配置 llm-mem 行为，保存并重启后生效</span>
           </div>
-          <button className="close-btn" onClick={handleCancel} title="关闭" aria-label="关闭">×</button>
         </div>
 
         <div className="settings-tabs">
