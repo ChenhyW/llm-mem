@@ -117,6 +117,7 @@ export class DataRoutes extends BaseRouteHandler {
 
     app.post('/api/vector/rebuild', this.handleRebuildVectors.bind(this));
     app.get('/api/vector/rebuild/status', this.handleRebuildStatus.bind(this));
+    app.get('/api/vector/rebuild/progress', this.handleRebuildProgress.bind(this));
 
     app.post('/api/prompts/semantic-context', validateBody(semanticContextPayloadSchema), this.handleSetPromptSemanticContext.bind(this));
   }
@@ -597,6 +598,46 @@ export class DataRoutes extends BaseRouteHandler {
 
   private handleRebuildStatus = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
     res.json(rebuildStatus);
+  });
+
+  private handleRebuildProgress = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
+    try {
+      // total = rows in metadata_observations
+      let total = 0;
+      try {
+        const { DB_PATH } = await import('../../../../shared/paths.js');
+        const { Database } = await import('bun:sqlite');
+        const db = new Database(DB_PATH, { readonly: true });
+        total = (db.query('SELECT COUNT(*) AS c FROM metadata_observations').get() as { c: number }).c;
+        db.close();
+      } catch { /* total stays 0 */ }
+
+      // vectorized / failed = id-map.json entries
+      let vectorized = 0;
+      let failed = 0;
+      const errors: string[] = [];
+      try {
+        const { join } = await import('path');
+        const { homedir } = await import('os');
+        const { readFileSync } = await import('fs');
+        const dataDir = process.env.LLM_MEM_DATA_DIR || join(homedir(), '.llm-mem');
+        const idMapPath = join(dataDir, 'hnswlib', 'id-map.json');
+        const idMap = JSON.parse(readFileSync(idMapPath, 'utf-8'));
+        for (const v of Object.values(idMap) as Array<Record<string, unknown>>) {
+          if (v.status === 'failed') {
+            failed++;
+            if (typeof v.vector_error === 'string' && errors.length < 5) errors.push(v.vector_error);
+          } else {
+            vectorized++;
+          }
+        }
+      } catch { /* id-map missing → zeros */ }
+
+      const running = rebuildStatus.status === 'running';
+      res.json({ status: running ? 'running' : 'idle', total, vectorized, failed, errors, startedAt: rebuildStatus.startedAt });
+    } catch (error) {
+      res.json({ status: 'idle', total: 0, vectorized: 0, failed: 0, errors: [] });
+    }
   });
 
 }

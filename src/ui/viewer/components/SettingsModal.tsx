@@ -212,16 +212,21 @@ export function SettingsModal({
     let timer: ReturnType<typeof setInterval> | undefined;
     const poll = async () => {
       try {
-        const res = await fetch('/api/vector/rebuild/status');
+        const res = await fetch('/api/vector/rebuild/progress');
         const data = await res.json();
         if (cancelled) return;
         if (data.status === 'running') {
           setIsRebuilding(true);
-          setRebuildStatus('正在重算向量…（已运行 ' + Math.floor((Date.now() - (data.startedAt || Date.now())) / 1000) + ' 秒）');
+          const parts = [`正在重算向量…（${data.vectorized ?? '?'}/${data.total ?? '?'}`];
+          if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
+          parts.push('）');
+          setRebuildStatus(parts.join(''));
           timer = setInterval(poll, 2000);
-        } else if (data.status === 'done') {
+        } else if (data.status === 'done' || data.vectorized === data.total) {
           setIsRebuilding(false);
-          setRebuildStatus('重算完成，已重建 ' + (data.elements ?? '?') + ' 条');
+          const parts = ['重算完成，已重建 ' + (data.vectorized ?? '?') + ' 条'];
+          if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
+          setRebuildStatus(parts.join(''));
         } else if (data.status === 'failed') {
           setIsRebuilding(false);
           setRebuildStatus('重算失败：' + (data.error ?? '未知错误'));

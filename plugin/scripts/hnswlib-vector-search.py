@@ -237,7 +237,15 @@ def load_id_map(hnsw_dir: str) -> dict[int, dict]:
     p = _id_map_path(hnsw_dir)
     with open(p) as f:
         m = json.load(f)
-    return {int(k): v for k, v in m.items()}
+    result = {}
+    for k, v in m.items():
+        if v.get("status") == "failed":
+            continue
+        entry = dict(v)
+        entry.pop("status", None)
+        entry.pop("vector_error", None)
+        result[int(k)] = entry
+    return result
 
 
 def _rebuild_index_on_disk(hnsw_dir: str, vecs: np.ndarray, meta_map: dict[int, dict]) -> None:
@@ -333,54 +341,21 @@ def cmd_build(args):
     rows = fetch_indexable_rows(db_path, limit)
     doc_texts = [r.get("document", "") for r in rows]
 
-    # Embed via Ollama. Fall back to random vectors when retriever is disabled
-    # or Ollama is unreachable (keeps plugin alive during preflight).
-    embeddings = []
-    if RETRIEVE_EMBEDDING:
-        for t in doc_texts:
-            try:
-                e = embed_one(t)
-            except Exception:
-                e = None
-            embeddings.append(e)
-        # Infer dim from the first non-null embedding (authoritative: the model's actual output).
-        actual_dim = next((len(e) for e in embeddings if e is not None), _pick_dim(hnsw_dir) or EMBED_DIM)
-    else:
-        actual_dim = _pick_dim(hnsw_dir) or EMBED_DIM
-        for _ in doc_texts:
-            embeddings.append(np.random.default_rng(42).random(actual_dim).tolist())
-    dim = actual_dim
-
-    # Keep only rows with a usable vector.
-    kept = [
-        (row, vec)
-        for row, vec in zip(rows, embeddings)
-        if vec is not None and len(vec) == dim
-    ]
-    if len(kept) < len(rows):
-        print(
-            f"INFO: dropped {len(rows)-len(kept)}/{len(rows)} rows "
-            f"(missing/bad embedding); indexing {len(kept)}",
-            file=sys.stderr,
-        )
-
-    if not kept:
-        print(json.dumps({"built": False, "reason": "no indexable rows"}))
-        return
-
-    index = hnswlib.Index(space="cosine", dim=dim)
-    index.init_index(
-        max_elements=max(40, len(kept)),
-        ef_construction=200,
-        M=16,
-        random_seed=42,
-    )
-    index.set_ef(40)
-
+    # ── Phase 1: embed & save id-map incrementally ──
+    os.makedirs(hnsw_dir, exist_ok=True)
     by_label: dict[int, dict] = {}
     vecs: list[list[float]] = []
-    for label, (row, vec) in enumerate(kept):
-        by_label[label] = {
+
+    def _write_progress(label: int, meta: dict, vec: list[float] | None):
+        """Add one entry to by_label, save id-map atomically."""
+        nonlocal by_label, vecs
+        by_label[label] = meta
+        if vec is not None:
+            vecs.append(vec)
+        save_id_map(hnsw_dir, by_label)
+
+    for label, row in enumerate(rows):
+        meta: dict = {
             "id": int(row["id"]),
             "sqlite_id": int(row["sqlite_id"]),
             "doc_type": row.get("doc_type"),
@@ -389,18 +364,60 @@ def cmd_build(args):
             "platform_source": row.get("platform_source"),
             "created_at_epoch": int(row["created_at_epoch"]) if row.get("created_at_epoch") is not None else 0,
         }
-        vecs.append(vec)
-    _build_index_in_memory(index, np.array(vecs, dtype=np.float32), list(range(len(kept))))
+        text = doc_texts[label]
+        if RETRIEVE_EMBEDDING:
+            try:
+                vec = embed_one(text)
+                if vec is not None:
+                    meta["status"] = "vectorized"
+                    _write_progress(label, meta, vec)
+                else:
+                    meta["status"] = "failed"
+                    meta["vector_error"] = "embed returned None"
+                    _write_progress(label, meta, None)
+            except Exception as e:
+                meta["status"] = "failed"
+                meta["vector_error"] = repr(e)
+                _write_progress(label, meta, None)
+        else:
+            # Random vectors (retriever disabled)
+            dim = _pick_dim(hnsw_dir) or EMBED_DIM
+            vec = np.random.default_rng(42).random(dim).tolist()
+            meta["status"] = "vectorized"
+            _write_progress(label, meta, vec)
 
-    # Persist as numpy arrays.  The native hnswlib Index.save_index is
-    # unreliable across versions (sparse-index / Windows build), so we
-    # round-trip the vectors and label map ourselves and rebuild the graph
-    # on load.
+    # ── Phase 2: build hnsw index from vectorized entries only ──
+    vectorized = [(k, v) for k, v in by_label.items() if v.get("status") != "failed"]
+    if not vecs or not vectorized:
+        print(json.dumps({"built": False, "reason": "no vectorized rows", "total": len(rows)}))
+        return
+
+    # Infer dim from the first vector
+    dim = len(vecs[0])
+    index = hnswlib.Index(space="cosine", dim=dim)
+    index.init_index(
+        max_elements=max(40, len(vecs)),
+        ef_construction=200,
+        M=16,
+        random_seed=42,
+    )
+    index.set_ef(40)
+    _build_index_in_memory(index, np.array(vecs, dtype=np.float32), list(range(len(vecs))))
+
+    # Persist vectors (not id-map — id-map already saved per-row)
     _save_vector_bin(hnsw_dir, np.array(vecs, dtype=np.float32))
-    save_id_map(hnsw_dir, by_label)
+
+    # Rebuild the full id-map with only vectorized entries (to keep labels contiguous)
+    final_map: dict[int, dict] = {}
+    for label, (orig_label, v) in enumerate(vectorized):
+        entry = dict(v)
+        entry.pop("status", None)
+        entry.pop("vector_error", None)
+        final_map[label] = entry
+    save_id_map(hnsw_dir, final_map)
 
     print(json.dumps(
-        {"built": True, "elements": len(kept), "dim": dim}
+        {"built": True, "elements": len(vecs), "dim": dim, "total": len(rows), "failed": len(rows) - len(vecs)}
     ))
 
 
