@@ -1,7 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { Settings, DependencyStatus } from '../types';
-import { TerminalPreview } from './TerminalPreview';
-import { useContextPreview } from '../hooks/useContextPreview';
 import { DEFAULT_SETTINGS } from '../constants/settings';
 
 export interface SettingsModalProps {
@@ -205,6 +203,7 @@ export function SettingsModal({
   };
 
   const [rebuildStatus, setRebuildStatus] = useState('');
+  const [customEmbedMode, setCustomEmbedMode] = useState(false);
   const handleRebuild = async () => {
     setRebuildStatus('正在重算向量…');
     try {
@@ -215,8 +214,6 @@ export function SettingsModal({
       setRebuildStatus('重算请求失败');
     }
   };
-
-  const contextPreview = useContextPreview(draft);
 
   if (!isOpen) return null;
 
@@ -266,10 +263,6 @@ export function SettingsModal({
                 ]}
               />
             </Field>
-            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
-              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
-                onChange={v => set('LLM_MEM_MODEL', v)} />
-            </Field>
             <Field label="输出语言" tooltip="LLM 生成观察摘要时使用的语言">
               <SelectField
                 value={draft.LLM_MEM_OUTPUT_LANGUAGE ?? 'zh'}
@@ -281,7 +274,12 @@ export function SettingsModal({
               />
             </Field>
             {draft.LLM_MEM_PROVIDER === 'claude' && (
-              <Field label="Claude 认证方式" tooltip="subscription / api-key / gateway / cli">
+              <>
+                <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
+                  <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
+                    onChange={v => set('LLM_MEM_MODEL', v)} />
+                </Field>
+                <Field label="Claude 认证方式" tooltip="subscription / api-key / gateway / cli">
                 <SelectField
                   value={draft.LLM_MEM_CLAUDE_AUTH_METHOD ?? 'subscription'}
                   onChange={v => set('LLM_MEM_CLAUDE_AUTH_METHOD', v)}
@@ -293,6 +291,7 @@ export function SettingsModal({
                   ]}
                 />
               </Field>
+              </>
             )}
             {draft.LLM_MEM_PROVIDER === 'gemini' && (
               <>
@@ -341,6 +340,14 @@ export function SettingsModal({
           </CollapsibleSection>
         );
       case 'embed':
+        const embedModel = draft.LLM_MEM_VECTOR_EMBEDDING_MODEL ?? 'qwen3-embedding:0.6b';
+        const EMBEDDING_PRESETS = ['qwen3-embedding:0.6b', 'nomic-embed-text', 'bge-m3', 'multilingual-e5-large'];
+        const isCustomEmbed = customEmbedMode || !EMBEDDING_PRESETS.includes(embedModel);
+        const handleEmbedSelect = (v: string) => {
+          if (v === '__custom__') { setCustomEmbedMode(true); return; }
+          setCustomEmbedMode(false);
+          set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v);
+        };
         return (
           <CollapsibleSection title="向量搜索 (Ollama + hnswlib)">
             <Field label="Ollama 地址 (OLLAMA_URL)" tooltip="例如 http://192.168.1.2:11434">
@@ -348,16 +355,27 @@ export function SettingsModal({
                 onChange={v => set('LLM_MEM_OLLAMA_URL', v)} />
             </Field>
             <Field label="嵌入模型" tooltip="用于 hnswlib 向量检索的嵌入模型名">
-              <SelectField
-                value={draft.LLM_MEM_VECTOR_EMBEDDING_MODEL ?? 'qwen3-embedding:0.6b'}
-                onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)}
-                options={[
-                  { value: 'qwen3-embedding:0.6b', label: 'qwen3-embedding:0.6b（多语言，推荐）' },
-                  { value: 'nomic-embed-text', label: 'nomic-embed-text（英文）' },
-                  { value: 'bge-m3', label: 'bge-m3（多语言）' },
-                  { value: 'multilingual-e5-large', label: 'multilingual-e5-large（多语言）' },
-                ]}
-              />
+              {isCustomEmbed ? (
+                <TextField value={embedModel === '__custom__' ? '' : embedModel}
+                  onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)} />
+              ) : (
+                <SelectField
+                  value={embedModel}
+                  onChange={handleEmbedSelect}
+                  options={[
+                    { value: 'qwen3-embedding:0.6b', label: 'qwen3-embedding:0.6b（多语言，推荐）' },
+                    { value: 'nomic-embed-text', label: 'nomic-embed-text（英文）' },
+                    { value: 'bge-m3', label: 'bge-m3（多语言）' },
+                    { value: 'multilingual-e5-large', label: 'multilingual-e5-large（多语言）' },
+                    { value: '__custom__', label: '自定义...' },
+                  ]}
+                />
+              )}
+              {isCustomEmbed && (
+                <div className="settings-field-desc" style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                  当前自定义模型：「{embedModel === '__custom__' ? '' : embedModel}」，通过下拉选择预设可直接切换。
+                </div>
+              )}
             </Field>
             <ToggleField label="禁用向量搜索"
               value={draft.LLM_MEM_DISABLE_VECTOR_SEARCH ?? 'false'}
@@ -435,9 +453,6 @@ export function SettingsModal({
                 value={draft.LLM_MEM_CONTEXT_SHOW_LAST_MESSAGE ?? 'false'}
                 onChange={v => set('LLM_MEM_CONTEXT_SHOW_LAST_MESSAGE', v)} />
             </CollapsibleSection>
-            <CollapsibleSection title="上下文预览">
-              <TerminalPreview content={contextPreview.preview || ''} />
-            </CollapsibleSection>
           </>
         );
       case 'diagnosis':
@@ -476,8 +491,11 @@ export function SettingsModal({
     <div className="modal-backdrop" onClick={handleCancel}>
       <div className="context-settings-modal" onClick={e => e.stopPropagation()}>
         <div className="settings-modal-header">
-          <h2>设置</h2>
-          <button className="close-btn" onClick={handleCancel}>×</button>
+          <div>
+            <h2>设置</h2>
+            <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>配置 llm-mem 行为，保存并重启后生效</span>
+          </div>
+          <button className="close-btn" onClick={handleCancel} title="关闭" aria-label="关闭">×</button>
         </div>
 
         <div className="settings-tabs">

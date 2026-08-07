@@ -539,6 +539,36 @@
       line-height: 1;
     }
 
+    .settings-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--color-border-primary);
+      background: var(--color-bg-header);
+      flex-shrink: 0;
+    }
+    .settings-modal-header h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-text-primary);
+    }
+
+    .settings-modal-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 12px 20px;
+      border-top: 1px solid var(--color-border-primary);
+      background: var(--color-bg-secondary);
+      flex-shrink: 0;
+    }
+    .settings-modal-footer .settings-status {
+      margin-right: auto;
+    }
+
     .settings-tabs { display: flex; gap: 6px; padding: 10px 20px 0 20px; border-bottom: 1px solid var(--color-border-secondary); background: var(--color-bg-secondary); overflow-x: auto; flex-shrink: 0; }
 
     .settings-tab {
