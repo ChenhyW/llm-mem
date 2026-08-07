@@ -92,8 +92,8 @@ function Field({ label, tooltip, children }: FieldProps) {
     <div className="settings-field">
       <label className="settings-field-label">
         {label}
-        {tooltip && <span className="tooltip-indicator" title={tooltip}>?</span>}
       </label>
+      {tooltip && <div className="settings-field-desc">{tooltip}</div>}
       <div className="settings-field-input">{children}</div>
     </div>
   );
@@ -222,15 +222,15 @@ export function SettingsModal({
       case 'basic':
         return (
           <CollapsibleSection title="基础配置">
-            <Field label="Worker 端口" tooltip="Worker HTTP 服务端口（改后需重启）">
+            <Field label="Worker 端口" tooltip="Worker HTTP 服务监听的端口。llm-mem 默认 37701，改端口后需重启 Worker 生效。">
               <TextField value={draft.LLM_MEM_WORKER_PORT ?? DEFAULT_SETTINGS.LLM_MEM_WORKER_PORT}
                 onChange={v => set('LLM_MEM_WORKER_PORT', v)} />
             </Field>
-            <Field label="Worker 主机" tooltip="Worker 监听地址">
+            <Field label="Worker 主机" tooltip="Worker 监听地址。留空监听所有网卡；设为 127.0.0.1 仅本机可访问。">
               <TextField value={draft.LLM_MEM_WORKER_HOST ?? DEFAULT_SETTINGS.LLM_MEM_WORKER_HOST}
                 onChange={v => set('LLM_MEM_WORKER_HOST', v)} />
             </Field>
-            <Field label="日志级别" tooltip="DEBUG / INFO / WARN / ERROR / SILENT">
+            <Field label="日志级别" tooltip="Worker 控制台日志详细程度。DEBUG 最详细适合排查，INFO 为日常默认，WARN/ERROR 只留问题，SILENT 几乎不输出。">
               <SelectField
                 value={draft.LLM_MEM_LOG_LEVEL ?? 'INFO'}
                 onChange={v => set('LLM_MEM_LOG_LEVEL', v)}
@@ -243,7 +243,7 @@ export function SettingsModal({
                 ]}
               />
             </Field>
-            <Field label="数据目录" tooltip="llm-mem 数据存放目录（默认 ~/.llm-mem）">
+            <Field label="数据目录" tooltip="llm-mem 的 SQLite 数据库、日志等数据存放位置。默认 ~/.llm-mem，留空即用默认值。">
               <TextField value={draft.LLM_MEM_DATA_DIR ?? ''} placeholder="~/.llm-mem"
                 onChange={v => set('LLM_MEM_DATA_DIR', v)} />
             </Field>
@@ -252,7 +252,7 @@ export function SettingsModal({
       case 'model':
         return (
           <CollapsibleSection title="LLM Provider">
-            <Field label="Provider" tooltip="AI 模型提供商">
+            <Field label="Provider" tooltip="选择 LLM 提供商。claude 使用 Claude SDK（订阅制）；gemini 使用 Google AI；openrouter 使用 OpenRouter 网关，适合接 DeepSeek 等第三方模型。切换后下方字段会相应变化。">
               <SelectField
                 value={draft.LLM_MEM_PROVIDER ?? 'claude'}
                 onChange={v => set('LLM_MEM_PROVIDER', v)}
@@ -397,25 +397,25 @@ export function SettingsModal({
         return (
           <>
             <CollapsibleSection title="上下文注入">
-              <Field label="引用观察数" tooltip="注入上下文时检索的观察数量 (1-200)">
+              <Field label="引用观察数" tooltip="每次注入上下文时最多检索的相关观察记录数量（1-200）。数量越大背景信息越多，但消耗的 token 也越多。默认 50 条一般已够用。">
                 <TextField value={draft.LLM_MEM_CONTEXT_OBSERVATIONS ?? '50'}
                   onChange={v => set('LLM_MEM_CONTEXT_OBSERVATIONS', v)} />
               </Field>
-              <Field label="全文引用条数" tooltip="注入完整内容的条数 (0-20)">
+              <Field label="全文引用条数" tooltip="在注入的观察记录中，有多少条会带上完整的叙述文本（默认 0 即只注入标题）。打开后会大幅增加注入的 token 量，适合希望模型看到更多细节时使用。">
                 <TextField value={draft.LLM_MEM_CONTEXT_FULL_COUNT ?? '0'}
                   onChange={v => set('LLM_MEM_CONTEXT_FULL_COUNT', v)} />
               </Field>
-              <Field label="全文引用字段" tooltip="narrative 或 facts">
+              <Field label="全文引用字段" tooltip="决定全文引用时使用观察记录的哪个字段。narrative 是模型生成的叙事性摘要（推荐，信息量丰富）；facts 是结构化事实字段（适合需要精确数据时）。">
                 <SelectField
                   value={draft.LLM_MEM_CONTEXT_FULL_FIELD ?? 'narrative'}
                   onChange={v => set('LLM_MEM_CONTEXT_FULL_FIELD', v)}
                   options={[
-                    { value: 'narrative', label: 'narrative' },
-                    { value: 'facts', label: 'facts' },
+                    { value: 'narrative', label: 'narrative（叙事摘要，推荐）' },
+                    { value: 'facts', label: 'facts（结构化事实）' },
                   ]}
                 />
               </Field>
-              <Field label="引用会话数" tooltip="注入的最近会话数 (1-50)">
+              <Field label="引用会话数" tooltip="注入时回看最近多少个会话的时间窗口。默认 10，即只从最近 10 个会话里选观察记录；设大些可看到更早的工作，设小些更聚焦最近。">
                 <TextField value={draft.LLM_MEM_CONTEXT_SESSION_COUNT ?? '10'}
                   onChange={v => set('LLM_MEM_CONTEXT_SESSION_COUNT', v)} />
               </Field>
@@ -424,11 +424,11 @@ export function SettingsModal({
               <ToggleField label="启用语义注入"
                 value={draft.LLM_MEM_SEMANTIC_INJECT ?? 'false'}
                 onChange={v => set('LLM_MEM_SEMANTIC_INJECT', v)} />
-              <Field label="注入条数" tooltip="每次语义注入最多拼入的相关记忆条数 (1-20)">
+              <Field label="注入条数" tooltip="每次语义注入时最多拼入的相关记忆条数（1-20）。默认 5，数量越多信息越丰富但提示词越长。">
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_LIMIT ?? '5'}
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_LIMIT', v)} />
               </Field>
-              <Field label="最低匹配分数" tooltip="只返回分数 ≥ 此值的记忆 (0-1)，设 0 关闭过滤">
+              <Field label="最低匹配分数" tooltip="语义注入时只返回分数 ≥ 此值的记忆（0-1）。默认 0.75，值越高结果越精准但可能无匹配；设 0 关闭过滤。">
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_SCORE ?? '0.75'}
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_SCORE', v)} />
               </Field>
