@@ -296,6 +296,8 @@ def append_vector_to_index(
         new_label = 0
 
     # Store metadata for the new element.
+    meta = dict(meta)
+    meta["embed_model"] = EMBED_MODEL
     meta_map[new_label] = meta
 
     # Append the vector.
