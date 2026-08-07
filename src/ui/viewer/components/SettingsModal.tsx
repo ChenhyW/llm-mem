@@ -204,6 +204,18 @@ export function SettingsModal({
     onClose();
   };
 
+  const [rebuildStatus, setRebuildStatus] = useState('');
+  const handleRebuild = async () => {
+    setRebuildStatus('正在重算向量…');
+    try {
+      const res = await fetch('/api/vector/rebuild', { method: 'POST' });
+      const data = await res.json();
+      setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
+    } catch {
+      setRebuildStatus('重算请求失败');
+    }
+  };
+
   const contextPreview = useContextPreview(draft);
 
   if (!isOpen) return null;
@@ -213,10 +225,6 @@ export function SettingsModal({
       case 'basic':
         return (
           <CollapsibleSection title="基础配置">
-            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
-              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
-                onChange={v => set('LLM_MEM_MODEL', v)} />
-            </Field>
             <Field label="Worker 端口" tooltip="Worker HTTP 服务端口（改后需重启）">
               <TextField value={draft.LLM_MEM_WORKER_PORT ?? DEFAULT_SETTINGS.LLM_MEM_WORKER_PORT}
                 onChange={v => set('LLM_MEM_WORKER_PORT', v)} />
@@ -242,10 +250,6 @@ export function SettingsModal({
               <TextField value={draft.LLM_MEM_DATA_DIR ?? ''} placeholder="~/.llm-mem"
                 onChange={v => set('LLM_MEM_DATA_DIR', v)} />
             </Field>
-            <Field label="Python 版本" tooltip="用于向量搜索脚本的 Python 版本（如 3.13）">
-              <TextField value={draft.LLM_MEM_PYTHON_VERSION ?? '3.13'}
-                onChange={v => set('LLM_MEM_PYTHON_VERSION', v)} />
-            </Field>
           </CollapsibleSection>
         );
       case 'model':
@@ -259,6 +263,20 @@ export function SettingsModal({
                   { value: 'claude', label: 'claude (Claude SDK)' },
                   { value: 'gemini', label: 'gemini (Google)' },
                   { value: 'openrouter', label: 'openrouter (OpenRouter)' },
+                ]}
+              />
+            </Field>
+            <Field label="模型 (MODEL)" tooltip="生成观察摘要所使用的 LLM 模型名称">
+              <TextField value={draft.LLM_MEM_MODEL ?? DEFAULT_SETTINGS.LLM_MEM_MODEL}
+                onChange={v => set('LLM_MEM_MODEL', v)} />
+            </Field>
+            <Field label="输出语言" tooltip="LLM 生成观察摘要时使用的语言">
+              <SelectField
+                value={draft.LLM_MEM_OUTPUT_LANGUAGE ?? 'zh'}
+                onChange={v => set('LLM_MEM_OUTPUT_LANGUAGE', v)}
+                options={[
+                  { value: 'zh', label: '中文 (zh)' },
+                  { value: 'en', label: '英文 (en)' },
                 ]}
               />
             </Field>
@@ -310,9 +328,9 @@ export function SettingsModal({
                   <TextField value={draft.LLM_MEM_OPENROUTER_MODEL ?? 'xiaomi/mimo-v2-flash:free'}
                     onChange={v => set('LLM_MEM_OPENROUTER_MODEL', v)} />
                 </Field>
-                <Field label="OpenRouter Site URL" tooltip="用于 OpenRouter 统计（可选）">
-                  <TextField value={draft.LLM_MEM_OPENROUTER_SITE_URL ?? ''}
-                    onChange={v => set('LLM_MEM_OPENROUTER_SITE_URL', v)} />
+                <Field label="OpenRouter Base URL" tooltip="自定义 OpenAI 兼容网关地址（可选），留空用 OpenRouter 默认端点">
+                  <TextField value={draft.LLM_MEM_OPENROUTER_BASE_URL ?? ''}
+                    onChange={v => set('LLM_MEM_OPENROUTER_BASE_URL', v)} />
                 </Field>
                 <Field label="OpenRouter App Name">
                   <TextField value={draft.LLM_MEM_OPENROUTER_APP_NAME ?? 'llm-mem'}
@@ -330,12 +348,31 @@ export function SettingsModal({
                 onChange={v => set('LLM_MEM_OLLAMA_URL', v)} />
             </Field>
             <Field label="嵌入模型" tooltip="用于 hnswlib 向量检索的嵌入模型名">
-              <TextField value={draft.LLM_MEM_VECTOR_EMBEDDING_MODEL ?? 'nomic-embed-text'}
-                onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)} />
+              <SelectField
+                value={draft.LLM_MEM_VECTOR_EMBEDDING_MODEL ?? 'qwen3-embedding:0.6b'}
+                onChange={v => set('LLM_MEM_VECTOR_EMBEDDING_MODEL', v)}
+                options={[
+                  { value: 'qwen3-embedding:0.6b', label: 'qwen3-embedding:0.6b（多语言，推荐）' },
+                  { value: 'nomic-embed-text', label: 'nomic-embed-text（英文）' },
+                  { value: 'bge-m3', label: 'bge-m3（多语言）' },
+                  { value: 'multilingual-e5-large', label: 'multilingual-e5-large（多语言）' },
+                ]}
+              />
             </Field>
             <ToggleField label="禁用向量搜索"
               value={draft.LLM_MEM_DISABLE_VECTOR_SEARCH ?? 'false'}
               onChange={v => set('LLM_MEM_DISABLE_VECTOR_SEARCH', v)} />
+            <div className="settings-field" style={{ padding: '8px 10px', marginTop: 8, borderTop: '1px solid var(--color-border-secondary)' }}>
+              <button className="btn-warning" onClick={handleRebuild} type="button"
+                style={{ width: '100%', padding: '8px 0', fontSize: 13 }}>
+                全量重算向量
+              </button>
+              {rebuildStatus && (
+                <div style={{ marginTop: 6, fontSize: 12, color: rebuildStatus.includes('失败') ? '#ef4444' : rebuildStatus.includes('完成') ? 'var(--accent-color, #f0a000)' : '#f59e0b' }}>
+                  {rebuildStatus}
+                </div>
+              )}
+            </div>
           </CollapsibleSection>
         );
       case 'context':
@@ -363,6 +400,19 @@ export function SettingsModal({
               <Field label="引用会话数" tooltip="注入的最近会话数 (1-50)">
                 <TextField value={draft.LLM_MEM_CONTEXT_SESSION_COUNT ?? '10'}
                   onChange={v => set('LLM_MEM_CONTEXT_SESSION_COUNT', v)} />
+              </Field>
+            </CollapsibleSection>
+            <CollapsibleSection title="语义注入（按提示词检索）">
+              <ToggleField label="启用语义注入"
+                value={draft.LLM_MEM_SEMANTIC_INJECT ?? 'false'}
+                onChange={v => set('LLM_MEM_SEMANTIC_INJECT', v)} />
+              <Field label="注入条数" tooltip="每次语义注入最多拼入的相关记忆条数 (1-20)">
+                <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_LIMIT ?? '5'}
+                  onChange={v => set('LLM_MEM_SEMANTIC_INJECT_LIMIT', v)} />
+              </Field>
+              <Field label="最低匹配分数" tooltip="只返回分数 ≥ 此值的记忆 (0-1)，设 0 关闭过滤">
+                <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_SCORE ?? '0.75'}
+                  onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_SCORE', v)} />
               </Field>
             </CollapsibleSection>
             <CollapsibleSection title="显示选项">
@@ -424,7 +474,7 @@ export function SettingsModal({
 
   return (
     <div className="modal-backdrop" onClick={handleCancel}>
-      <div className="settings-modal" onClick={e => e.stopPropagation()}>
+      <div className="context-settings-modal" onClick={e => e.stopPropagation()}>
         <div className="settings-modal-header">
           <h2>设置</h2>
           <button className="close-btn" onClick={handleCancel}>×</button>

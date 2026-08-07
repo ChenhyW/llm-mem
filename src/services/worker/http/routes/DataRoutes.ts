@@ -107,6 +107,8 @@ export class DataRoutes extends BaseRouteHandler {
 
     app.post('/api/import', validateBody(importSchema), this.handleImport.bind(this));
 
+    app.post('/api/vector/rebuild', this.handleRebuildVectors.bind(this));
+
     app.post('/api/prompts/semantic-context', validateBody(semanticContextPayloadSchema), this.handleSetPromptSemanticContext.bind(this));
   }
 
@@ -543,6 +545,17 @@ export class DataRoutes extends BaseRouteHandler {
       success: true,
       stats
     });
+  });
+
+  private handleRebuildVectors = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { HnswSync } = await import('../../../sync/HnswSync.js');
+      await HnswSync.buildIndex();
+      res.json({ status: 'done', elements: undefined });
+    } catch (error) {
+      logger.error('HTTP', 'Manual vector rebuild failed', { error: error instanceof Error ? error.message : String(error) });
+      res.json({ status: 'failed', error: error instanceof Error ? error.message : String(error) });
+    }
   });
 
 }

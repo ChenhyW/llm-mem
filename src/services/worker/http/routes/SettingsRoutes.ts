@@ -240,7 +240,7 @@ export class SettingsRoutes extends BaseRouteHandler {
       'LLM_MEM_GEMINI_RATE_LIMITING_ENABLED',
       'LLM_MEM_OPENROUTER_API_KEY',
       'LLM_MEM_OPENROUTER_MODEL',
-      'LLM_MEM_OPENROUTER_SITE_URL',
+      'LLM_MEM_OPENROUTER_BASE_URL',
       'LLM_MEM_OPENROUTER_APP_NAME',
       'LLM_MEM_DATA_DIR',
       'LLM_MEM_LOG_LEVEL',
@@ -403,12 +403,12 @@ export class SettingsRoutes extends BaseRouteHandler {
       }
     }
 
-    if (settings.LLM_MEM_OPENROUTER_SITE_URL) {
+    if (settings.LLM_MEM_OPENROUTER_BASE_URL) {
       try {
-        new URL(settings.LLM_MEM_OPENROUTER_SITE_URL);
+        new URL(settings.LLM_MEM_OPENROUTER_BASE_URL);
       } catch (error) {
-        logger.debug('SETTINGS', 'Invalid URL format', { url: settings.LLM_MEM_OPENROUTER_SITE_URL, error: error instanceof Error ? error.message : String(error) });
-        return { valid: false, error: 'LLM_MEM_OPENROUTER_SITE_URL 必须是有效的 URL' };
+        logger.debug('SETTINGS', 'Invalid URL format', { url: settings.LLM_MEM_OPENROUTER_BASE_URL, error: error instanceof Error ? error.message : String(error) });
+        return { valid: false, error: 'LLM_MEM_OPENROUTER_BASE_URL 必须是有效的 URL' };
       }
     }
 
