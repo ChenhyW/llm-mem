@@ -203,13 +203,51 @@ export function SettingsModal({
   };
 
   const [rebuildStatus, setRebuildStatus] = useState('');
+  const [isRebuilding, setIsRebuilding] = useState(false);
   const [customEmbedMode, setCustomEmbedMode] = useState(false);
+
+  // Poll rebuild status every 2s while running; recover on modal open
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/vector/rebuild/status');
+        const data = await res.json();
+        if (cancelled) return;
+        if (data.status === 'running') {
+          setIsRebuilding(true);
+          setRebuildStatus('正在重算向量…（已运行 ' + Math.floor((Date.now() - (data.startedAt || Date.now())) / 1000) + ' 秒）');
+          timer = setInterval(poll, 2000);
+        } else if (data.status === 'done') {
+          setIsRebuilding(false);
+          setRebuildStatus('重算完成，已重建 ' + (data.elements ?? '?') + ' 条');
+        } else if (data.status === 'failed') {
+          setIsRebuilding(false);
+          setRebuildStatus('重算失败：' + (data.error ?? '未知错误'));
+        } else {
+          setIsRebuilding(false);
+        }
+      } catch { /* server not ready */ }
+    };
+    poll();
+    return () => { cancelled = true; if (timer) clearInterval(timer); };
+  }, []);
+
   const handleRebuild = async () => {
     setRebuildStatus('正在重算向量…');
     try {
       const res = await fetch('/api/vector/rebuild', { method: 'POST' });
       const data = await res.json();
-      setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
+      if (data.status === 'started') {
+        setIsRebuilding(true);
+        setRebuildStatus('正在重算向量…');
+      } else if (data.status === 'running') {
+        setIsRebuilding(true);
+        setRebuildStatus('向量重算已在运行中');
+      } else {
+        setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
+      }
     } catch {
       setRebuildStatus('重算请求失败');
     }
@@ -386,6 +424,7 @@ export function SettingsModal({
               </button>
               {rebuildStatus && (
                 <div style={{ marginTop: 6, fontSize: 12, color: rebuildStatus.includes('失败') ? '#ef4444' : rebuildStatus.includes('完成') ? 'var(--accent-color, #f0a000)' : '#f59e0b' }}>
+                  {isRebuilding && <span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', marginRight: 6, animation: 'pulse 1s infinite' }} />}
                   {rebuildStatus}
                 </div>
               )}

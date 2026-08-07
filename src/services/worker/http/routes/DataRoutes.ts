@@ -19,6 +19,14 @@ import { getFirstObservationCreatedAt } from '../../../sqlite/observations/recen
 import { getUptimeSeconds } from '../../../../shared/uptime.js';
 import { assertCanonicalDecimal, type ContentKind } from '../../../sync/CanonicalContent.js';
 
+interface RebuildStatus {
+  status: 'idle' | 'running' | 'done' | 'failed';
+  elements?: number;
+  error?: string;
+  startedAt?: number;
+}
+let rebuildStatus: RebuildStatus = { status: 'idle' };
+
 const integerArrayLike = z.preprocess((value) => {
   if (Array.isArray(value)) return value;
   if (typeof value === 'string') {
@@ -108,6 +116,7 @@ export class DataRoutes extends BaseRouteHandler {
     app.post('/api/import', validateBody(importSchema), this.handleImport.bind(this));
 
     app.post('/api/vector/rebuild', this.handleRebuildVectors.bind(this));
+    app.get('/api/vector/rebuild/status', this.handleRebuildStatus.bind(this));
 
     app.post('/api/prompts/semantic-context', validateBody(semanticContextPayloadSchema), this.handleSetPromptSemanticContext.bind(this));
   }
@@ -548,14 +557,27 @@ export class DataRoutes extends BaseRouteHandler {
   });
 
   private handleRebuildVectors = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { HnswSync } = await import('../../../sync/HnswSync.js');
-      await HnswSync.buildIndex();
-      res.json({ status: 'done', elements: undefined });
-    } catch (error) {
-      logger.error('HTTP', 'Manual vector rebuild failed', { error: error instanceof Error ? error.message : String(error) });
-      res.json({ status: 'failed', error: error instanceof Error ? error.message : String(error) });
+    if (rebuildStatus.status === 'running') {
+      res.json({ status: 'running', message: '向量重算正在进行中' });
+      return;
     }
+    rebuildStatus = { status: 'running', startedAt: Date.now() };
+    res.json({ status: 'started', message: '向量重算已启动' });
+    // Fire-and-forget: rebuild can take minutes. Respond immediately.
+    (async () => {
+      try {
+        const { HnswSync } = await import('../../../sync/HnswSync.js');
+        await HnswSync.buildIndex();
+        rebuildStatus = { status: 'done', elements: undefined };
+      } catch (error) {
+        rebuildStatus = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
+        logger.error('HTTP', 'Manual vector rebuild failed', { error: error instanceof Error ? error.message : String(error) });
+      }
+    })();
+  });
+
+  private handleRebuildStatus = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
+    res.json(rebuildStatus);
   });
 
 }
