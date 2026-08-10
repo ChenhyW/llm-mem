@@ -225,3 +225,50 @@ ${observationSkeleton(mode)}
 
 ${mode.prompts.header_memory_continued}`;
 }
+
+interface ObsChunk {
+  tool_name?: string;
+  tool_input?: unknown;
+  tool_response?: unknown;
+  created_at_epoch?: number | null;
+  cwd?: string | undefined;
+}
+
+/**
+ * Build a single prompt that describes N observed tool-uses so the memory
+ * agent can compress them into one LLM response (returning one or more
+ * <observation> blocks). One <observed_from_primary_session> block per
+ * tool-use; the trailing instruction mirrors buildObservationPrompt so the
+ * LLM knows multiple <observation> results are valid.
+ *
+ * When observations.length === 1 the produced prompt is semantically
+ * identical to buildObservationPrompt, so non-batch callers can reuse this
+ * helper without changing output.
+ */
+export function buildObservationBatchPrompt(observations: ObsChunk[], opts?: { language?: string }): string {
+  const _lang = languageHeader(opts?.language);
+  const chunks = observations.map((obs, idx) => {
+    let toolInput: unknown = obs.tool_input;
+    let toolOutput: unknown = obs.tool_response;
+    try { toolInput = typeof obs.tool_input === 'string' ? JSON.parse(obs.tool_input) : obs.tool_input; }
+    catch { toolInput = obs.tool_input; }
+    try { toolOutput = typeof obs.tool_response === 'string' ? JSON.parse(obs.tool_response) : obs.tool_response; }
+    catch { toolOutput = obs.tool_response; }
+
+    const epoch = obs.created_at_epoch ?? Date.now();
+    const when = (() => { try { return new Date(epoch).toISOString(); } catch { return String(epoch); } })();
+    return `\n  <observed_from_primary_session id="${idx + 1}">
+  <what_happened>${obs.tool_name ?? 'unknown'}</what_happened>
+  <occurred_at>${when}</occurred_at>${obs.cwd ? `\n  <working_directory>${obs.cwd}</working_directory>` : ''}
+  <parameters>${truncateObservationField(toolInput)}</parameters>
+  <outcome>${truncateObservationField(toolOutput)}</outcome>
+</observed_from_primary_session>`;
+  }).join('\n');
+
+  return `${_lang}\n<observed_tool_uses total="${observations.length}">${chunks}\n</observed_tool_uses>
+
+If a <parameters> or <outcome> block above contains an "<elided chars=... />" marker, that field was truncated to fit the observer's context window. Describe only what you can see in the kept portion and do not infer details about the elided range.
+
+Return one or more <observation>...</observation> blocks — ideally one <observation> per <observed_from_primary_session> above, preserving order — or an empty response if all these tool uses should be skipped. Concrete debugging findings from logs, queue state, database rows, session routing, or code-path inspection count as durable discoveries and should be recorded.
+Never reply with prose such as "Skipping", "No substantive tool executions", or any explanation outside XML. Non-XML text is discarded.`;
+}

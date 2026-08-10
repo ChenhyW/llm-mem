@@ -2708,10 +2708,20 @@ export class SessionStore {
     overrideTimestampEpoch?: number,
     generatedByModel?: string,
     inputTokens?: number | null,
-    outputTokens?: number | null
+    outputTokens?: number | null,
+    tokenMode: 'all' | 'last_only' = 'all'
   ): { observationIds: number[]; summaryId: number | null; createdAtEpoch: number } {
     const timestampEpoch = overrideTimestampEpoch ?? Date.now();
     const timestampIso = new Date(timestampEpoch).toISOString();
+    const obsCount = observations.length;
+
+    // Batch-observation token attribution.  Default 'all' keeps every
+    // historical / non-batch call's behaviour identical (each observation
+    // stamped with the full LLM-usage figures).  When a batch reduces M
+    // observations into a SINGLE LLM call ('last_only'), the billable call
+    // is attributed to the LAST observation of the batch so the total usage
+    // still sums correctly while only one row carries the real input/output.
+    const isLastOnly = tokenMode === 'last_only' && obsCount > 1;
 
     const storeTx = this.db.transaction(() => {
       const observationIds: number[] = [];
@@ -2730,8 +2740,12 @@ export class SessionStore {
         'SELECT id FROM observations WHERE memory_session_id = ? AND content_hash = ?'
       );
 
-      for (const observation of observations) {
+      for (let obsIdx = 0; obsIdx < obsCount; obsIdx++) {
+        const observation = observations[obsIdx];
         const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
+        const isLastObs = obsIdx === obsCount - 1;
+        const inputTokensThis = (isLastOnly && !isLastObs) ? 0 : (inputTokens ?? 0);
+        const outputTokensThis = (isLastOnly && !isLastObs) ? 0 : (outputTokens ?? 0);
         const inserted = obsStmt.get(
           memorySessionId,
           project,
@@ -2745,8 +2759,8 @@ export class SessionStore {
           JSON.stringify(observation.files_modified),
           promptNumber || null,
           discoveryTokens,
-          inputTokens ?? 0,
-          outputTokens ?? 0,
+          inputTokensThis,
+          outputTokensThis,
           observation.agent_type ?? null,
           observation.agent_id ?? null,
           contentHash,

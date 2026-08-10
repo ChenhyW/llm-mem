@@ -286,7 +286,8 @@ export async function processAgentResponse(
   modelId?: string,
   responseContext?: ResponseContext,
   inputTokens?: number | null,
-  outputTokens?: number | null
+  outputTokens?: number | null,
+  tokenMode: 'all' | 'last_only' = 'all'
 ): Promise<void> {
   const processingStartedAt = Date.now();
   session.lastGeneratorActivity = Date.now();
@@ -414,7 +415,8 @@ export async function processAgentResponse(
       originalTimestamp ?? undefined,
       modelId,
       inputTokens,
-      outputTokens
+      outputTokens,
+      tokenMode
     );
   } finally {
     session.pendingAgentId = null;
@@ -512,7 +514,8 @@ export async function processAgentResponse(
     projectRoot,
     discoveryTokens,
     inputTokens,
-    outputTokens
+    outputTokens,
+    tokenMode
   );
 
   await syncAndBroadcastSummary(
@@ -562,7 +565,8 @@ async function syncAndBroadcastObservations(
   projectRoot?: string,
   discoveryTokens: number = 0,
   inputTokens?: number | null,
-  outputTokens?: number | null
+  outputTokens?: number | null,
+  tokenMode: 'all' | 'last_only' = 'all'
 ): Promise<void> {
   const memorySessionId = session.memorySessionId;
   if (!memorySessionId) {
@@ -574,6 +578,13 @@ async function syncAndBroadcastObservations(
   // duplicate IDs. Syncing them 1:1 triggers repeated Chroma "IDs already exist"
   // reconciles. See issue #2240.
   const uniqueObservationIds = [...new Set(result.observationIds)];
+  // For 'last_only' token attribution (a batch reduces N observations into a
+  // single LLM call) we mirror the store logic: only the LAST observation of
+  // the batch carries the real input/output tokens, the rest get 0. This keeps
+  // the SSE-broadcast payload byte-identical to what the database row holds so
+  // UI display (SummaryCard/ObservationCard formatTokens) stays consistent.
+  const isLastOnly = tokenMode === 'last_only' && uniqueObservationIds.length > 1;
+  const lastUniqueObsId = uniqueObservationIds[uniqueObservationIds.length - 1];
 
   for (const obsId of uniqueObservationIds) {
     const observationIndex = result.observationIds.indexOf(obsId);
@@ -614,6 +625,7 @@ async function syncAndBroadcastObservations(
 
     dbManager.getCloudSync()?.notify();
 
+    const isLastObs = !isLastOnly || obsId === lastUniqueObsId;
     broadcastObservation(worker, {
       id: obsId,
       memory_session_id: session.memorySessionId,
@@ -632,8 +644,8 @@ async function syncAndBroadcastObservations(
       prompt_number: context.promptNumber,
       created_at_epoch: result.createdAtEpoch,
       discovery_tokens: discoveryTokens,
-      input_tokens: inputTokens ?? undefined,
-      output_tokens: outputTokens ?? undefined
+      input_tokens: isLastObs ? (inputTokens ?? undefined) : 0,
+      output_tokens: isLastObs ? (outputTokens ?? undefined) : 0
     });
   }
 

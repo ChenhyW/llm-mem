@@ -18,6 +18,21 @@ export interface DrainOptions {
   idleTimeoutMs?: number;
 }
 
+export interface DrainBatchOptions {
+  sessionDbId: number;
+  signal: AbortSignal;
+  onIdleTimeout?: () => void;
+  idleTimeoutMs?: number;
+  /** Max observations to collect before one LLM call; <2 disables batching. */
+  batchSize: number;
+  /** Milliseconds to wait for more observations before flushing an in-progress batch. */
+  timeoutMs: number;
+}
+
+export type BatchedMessage =
+  | { kind: 'normal'; messages: PendingMessageWithId[]; batchFirstAt: number; batchCount: number }
+  | { kind: 'summarize'; message: PendingMessageWithId };
+
 /**
  * Per-session in-RAM observation buffer. This replaces the durable
  * `pending_messages` SQLite queue (and the BullMQ engine that mirrored it).
@@ -133,6 +148,157 @@ export class SessionMessageBuffer {
       total += list.length;
     }
     return total;
+  }
+
+  /**
+   * Like drain() but yields one or more observations at a time so a batch-aware
+   * consumer can compress N observations into a single LLM call. Key rules:
+   *  - summarize messages are NEVER absorbed into a batch: they short-circuit
+   *    any in-progress collection and yield as { kind: 'summarize' } immediately,
+   *    because the session summary is a once-off, non-dilutable action.
+   *  - the batch is flushed when either (a) enough observations accumulate
+   *    (>= batchSize) or (b) the batch timeout elapses (whichever comes first).
+   *  - the last observed message is always emitted (batch of 1 is valid) — a
+   *    lingering in-progress batch must not be silently dropped.
+   */
+  async *drainBatches(options: DrainBatchOptions): AsyncIterableIterator<BatchedMessage> {
+    const { sessionDbId, signal, onIdleTimeout, idleTimeoutMs = IDLE_TIMEOUT_MS, batchSize, timeoutMs } = options;
+    let lastActivityTime = Date.now();
+
+    while (!signal.aborted) {
+      // Priority: any buffered summarize must be flushed immediately — never
+      // let an in-progress observation batch bury the once-per-session summary.
+      const pendingSummary = this._peekUnclaimedSummarize(sessionDbId);
+      if (pendingSummary) {
+        this._unclaim(pendingSummary._persistentId);
+        yield { kind: 'summarize', message: pendingSummary };
+        lastActivityTime = Date.now();
+        continue;
+      }
+
+      const claimed = this.claimNext(sessionDbId);
+      if (claimed) {
+        lastActivityTime = Date.now();
+        if (claimed.message.type === 'summarize') {
+          yield {
+            kind: 'summarize',
+            message: {
+              ...claimed.message,
+              _persistentId: claimed.id,
+              _originalTimestamp: claimed.enqueuedAt
+            }
+          };
+          continue;
+        }
+
+        // Build an observation batch: keep claiming until full, a summarize
+        // appears (unclaim it so the loop-top priority picks it up next), or
+        // the buffer runs dry.
+        const batchFirstAt = Date.now();
+        const batch: PendingMessageWithId[] = [{
+          ...claimed.message,
+          _persistentId: claimed.id,
+          _originalTimestamp: claimed.enqueuedAt
+        }];
+
+        while (batch.length < batchSize && !signal.aborted) {
+          const next = this.claimNext(sessionDbId);
+          if (!next) break;
+          if (next.message.type === 'summarize') {
+            this._unclaim(next.id);
+            break;
+          }
+          lastActivityTime = Date.now();
+          batch.push({
+            ...next.message,
+            _persistentId: next.id,
+            _originalTimestamp: next.enqueuedAt
+          });
+        }
+
+        // Wait a window for more observations unless the batch is full or a
+        // summarize is queued (which we must not delay for).
+        if (batch.length < batchSize && !this._peekUnclaimedSummarize(sessionDbId)) {
+          await this._waitForBatch(sessionDbId, signal, timeoutMs);
+          while (batch.length < batchSize && !signal.aborted) {
+            const next = this.claimNext(sessionDbId);
+            if (!next) break;
+            if (next.message.type === 'summarize') { this._unclaim(next.id); break; }
+            batch.push({
+              ...next.message,
+              _persistentId: next.id,
+              _originalTimestamp: next.enqueuedAt
+            });
+          }
+        }
+
+        yield {
+          kind: 'normal',
+          messages: batch,
+          batchFirstAt,
+          batchCount: batch.length
+        };
+        continue;
+      }
+
+      // Nothing buffered — wait for new work, honoring the global idle timeout.
+      const received = await this.waitForMessage(sessionDbId, signal, idleTimeoutMs);
+      if (!received && !signal.aborted) {
+        const idleDuration = Date.now() - lastActivityTime;
+        if (idleDuration >= idleTimeoutMs) {
+          logger.info('SESSION', 'Idle timeout reached in batch drain, triggering abort', {
+            sessionDbId,
+            idleDurationMs: idleDuration,
+            thresholdMs: idleTimeoutMs
+          });
+          onIdleTimeout?.();
+          return;
+        }
+      } else {
+        lastActivityTime = Date.now();
+      }
+    }
+  }
+
+  /** Peek the first un-claimed summarize as a full PendingMessageWithId, if any. */
+  private _peekUnclaimedSummarize(sessionDbId: number): PendingMessageWithId | null {
+    const list = this.buffers.get(sessionDbId);
+    if (!list) return null;
+    for (const m of list) {
+      if (!m.claimed) {
+        if (m.message.type === 'summarize') {
+          return { ...m.message, _persistentId: m.id, _originalTimestamp: m.enqueuedAt };
+        }
+        if (m.message.type === 'observation') break;
+      }
+    }
+    return null;
+  }
+
+  private _unclaim(messageId: number): void {
+    for (const list of this.buffers.values()) {
+      for (const m of list) {
+        if (m.id === messageId) { m.claimed = false; return; }
+      }
+    }
+  }
+
+  private _waitForBatch(sessionDbId: number, signal: AbortSignal, timeoutMs: number): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      const events = this.getEvents(sessionDbId);
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const cleanup = () => {
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+        events.off('message', onMessage);
+        signal.removeEventListener('abort', onAbort);
+      };
+      const onMessage = () => { cleanup(); resolve(true); };
+      const onAbort = () => { cleanup(); resolve(false); };
+      const onTimeout = () => { cleanup(); resolve(false); };
+      events.once('message', onMessage);
+      signal.addEventListener('abort', onAbort, { once: true });
+      timeoutId = setTimeout(onTimeout, timeoutMs);
+    });
   }
 
   getMessagesByIds(sessionDbId: number, messageIds: number[]): PendingMessageWithId[] {

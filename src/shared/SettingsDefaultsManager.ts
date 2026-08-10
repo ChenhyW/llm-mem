@@ -76,6 +76,11 @@ export interface SettingsDefaults {
   LLM_MEM_CLOUD_SYNC_DEVICE_ID: string;
   LLM_MEM_CLOUD_SYNC_DEVICE_NAME: string;
   LLM_MEM_OUTPUT_LANGUAGE: string;  // 'zh' | 'en' — language for observation/summary output
+  // Observation batching (per-invocation billing optimization): collect N
+  // observations (or until the timeout elapses) and compress them into a
+  // single LLM call. 1 = disabled (byte-identical to non-batched behaviour).
+  LLM_MEM_OBS_BATCH_SIZE: string;           // default '1' — disabled
+  LLM_MEM_OBS_BATCH_TIMEOUT_MS: string;     // default '15000' — 15s flush window
   LLM_MEM_CLOUD_SYNC_WS: string;    // advisory WebSocket speed layer (Phase 4) — 'false' = HTTP polling only
   LLM_MEM_TELEGRAM_ENABLED: string;
   LLM_MEM_TELEGRAM_BOT_TOKEN: string;
@@ -173,7 +178,12 @@ export class SettingsDefaultsManager {
     LLM_MEM_CLOUD_SYNC_DEVICE_ID: '',      // Minted at first CloudSync start, then persisted back here
     LLM_MEM_CLOUD_SYNC_DEVICE_NAME: hostname(),  // Human-readable label for the cmem.ai Devices panel
     LLM_MEM_OUTPUT_LANGUAGE: 'zh',
-    LLM_MEM_CLOUD_SYNC_WS: 'true',  // Advisory WebSocket speed layer (plan Phase 4). 'false' = HTTP polling only — sync stays fully correct, just poll-latency (prime directive #2)
+    // Observation batching (per-invocation billing optimization). '1' = disabled
+    // (byte-identical to the pre-batching behaviour). Raise LLM_MEM_OBS_BATCH_SIZE
+    // to N>=2 to collect N observations (bounded by the timeout) into one LLM call.
+    LLM_MEM_OBS_BATCH_SIZE: '1',
+    LLM_MEM_OBS_BATCH_TIMEOUT_MS: '15000',
+    LLM_MEM_CLOUD_SYNC_WS: 'true',
     LLM_MEM_TELEGRAM_ENABLED: 'true',
     LLM_MEM_TELEGRAM_BOT_TOKEN: '',
     LLM_MEM_TELEGRAM_CHAT_ID: '',

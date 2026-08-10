@@ -481,6 +481,20 @@ export function SettingsModal({
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_CHARS', v)} />
               </Field>
             </CollapsibleSection>
+            <CollapsibleSection title="观察记录批次处理">
+              <Field label="批次大小（N）"
+                tooltip="把 N 条观察记录合并成一次 LLM 摘要调用，减少按调用次数计费的 LLM 用量。默认 1（关闭，每条观察一次 LLM，行为不变）。设为 2-10 可节省调用次数；N 越大单次 prompt 越长、单次调用越贵但调用次数越少。建议从 3 起步观察。窗口内 SSE 推送延后到整批完成后一次发送。">
+                <TextField value={draft.LLM_MEM_OBS_BATCH_SIZE ?? '1'}
+                  onChange={(v: string) => set('LLM_MEM_OBS_BATCH_SIZE', v)}
+                  type="number" />
+              </Field>
+              <Field label="批次超时（毫秒）"
+                tooltip="攒够 N 条前，最多等多久就发一次 LLM。默认 15000（15 秒）。避免长间隔的零散观察一直攒不触发。">
+                <TextField value={draft.LLM_MEM_OBS_BATCH_TIMEOUT_MS ?? '15000'}
+                  onChange={(v: string) => set('LLM_MEM_OBS_BATCH_TIMEOUT_MS', v)}
+                  type="number" />
+              </Field>
+            </CollapsibleSection>
             <CollapsibleSection title="显示选项">
               <ToggleField label="显示读取 token 数"
                 value={draft.LLM_MEM_CONTEXT_SHOW_READ_TOKENS ?? 'false'}

@@ -2,6 +2,7 @@ import { DatabaseManager } from './DatabaseManager.js';
 import { logger } from '../../utils/logger.js';
 import type { ActiveSession, PendingMessage, PendingMessageWithId, ObservationData } from '../worker-types.js';
 import { SessionMessageBuffer } from './SessionMessageBuffer.js';
+import type { BatchedMessage } from './SessionMessageBuffer.js';
 import { getSdkProcessForSession, ensureSdkProcessExit } from '../../supervisor/process-registry.js';
 import { getSupervisor } from '../../supervisor/index.js';
 import { telemetryBuffer } from '../telemetry/buffer.js';
@@ -385,6 +386,58 @@ export class SessionManager {
       session.lastGeneratorActivity = Date.now();
 
       yield message;
+    }
+  }
+
+  /**
+   * Batch-oriented message iterator. Yields either a single summarize message
+   * (flushed immediately, never diluted) or a batch of one or more observations
+   * collected until batchSize is reached or the per-batch timeout elapses.
+   *
+   * Callers (the observation generator loops in the providers) use this to
+   * compress N observations into a single LLM call, saving per-invocation
+   * billing. When batchSize <= 1 the behavior is byte-identical to the
+   * non-batched path: each observation is yielded as a batch of one.
+   */
+  async *getBatchIterator(
+    sessionDbId: number,
+    batchSize: number,
+    batchTimeoutMs: number
+  ): AsyncIterableIterator<BatchedMessage> {
+    let session = this.sessions.get(sessionDbId);
+    if (!session) {
+      session = this.initializeSession(sessionDbId);
+    }
+
+    await this.resetProcessingToPending(sessionDbId);
+
+    for await (const batch of this.buffer.drainBatches({
+      sessionDbId,
+      signal: session.abortController.signal,
+      onIdleTimeout: () => {
+        logger.info('SESSION', 'Triggering abort due to idle timeout to kill subprocess', { sessionDbId });
+        session.idleTimedOut = true;
+        session.abortReason = 'idle';
+        session.abortController.abort();
+      },
+      batchSize,
+      timeoutMs: batchTimeoutMs
+    })) {
+      if (batch.kind === 'normal') {
+        for (const msg of batch.messages) {
+          session.claimedMessageIds.push(msg._persistentId);
+          if (session.earliestPendingTimestamp === null) {
+            session.earliestPendingTimestamp = msg._originalTimestamp;
+          } else {
+            session.earliestPendingTimestamp = Math.min(session.earliestPendingTimestamp, msg._originalTimestamp);
+          }
+        }
+        session.lastGeneratorActivity = Date.now();
+      } else {
+        session.claimedMessageIds.push(batch.message._persistentId);
+        session.lastGeneratorActivity = Date.now();
+      }
+      yield batch;
     }
   }
 

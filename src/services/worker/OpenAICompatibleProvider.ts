@@ -1,9 +1,9 @@
 import { DatabaseManager } from './DatabaseManager.js';
 import { SessionManager } from './SessionManager.js';
 import { logger } from '../../utils/logger.js';
+import { buildInitPrompt, buildObservationPrompt, buildObservationBatchPrompt, buildSummaryPrompt, buildContinuationPrompt } from '../../sdk/prompts.js';
 import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js';
 import { USER_SETTINGS_PATH } from '../../shared/paths.js';
-import { buildInitPrompt, buildObservationPrompt, buildSummaryPrompt, buildContinuationPrompt } from '../../sdk/prompts.js';
 import type { ActiveSession, ConversationMessage } from '../worker-types.js';
 import { ModeManager } from '../domain/ModeManager.js';
 import type { ModeConfig } from '../domain/types.js';
@@ -143,22 +143,156 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     config: TConfig,
     mode: ModeConfig
   ): Promise<void> {
+    const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+    const batchSize = this._parsePositiveInt(settings.LLM_MEM_OBS_BATCH_SIZE, 1);
+    const batchTimeoutMs = this._parsePositiveInt(settings.LLM_MEM_OBS_BATCH_TIMEOUT_MS, 15_000);
+
     let lastCwd: string | undefined;
 
-    for await (const message of this.sessionManager.getMessageIterator(session.sessionDbId)) {
-      session.pendingAgentId = message.agentId ?? null;
-      session.pendingAgentType = message.agentType ?? null;
-
-      if (message.cwd) {
-        lastCwd = message.cwd;
+    if (batchSize >= 2) {
+      for await (const batch of this.sessionManager.getBatchIterator(session.sessionDbId, batchSize, batchTimeoutMs)) {
+        if (batch.kind === 'summarize') {
+          session.pendingAgentId = batch.message.agentId ?? null;
+          session.pendingAgentType = batch.message.agentType ?? null;
+          if (batch.message.cwd) lastCwd = batch.message.cwd;
+          await this.processSummaryMessage(session, batch.message, worker, config, mode, session.earliestPendingTimestamp, lastCwd);
+        } else {
+          // Observation batch — carry agent identity + cwd from the last message.
+          session.pendingAgentId = batch.messages[batch.messages.length - 1].agentId ?? null;
+          session.pendingAgentType = batch.messages[batch.messages.length - 1].agentType ?? null;
+          const cwd = batch.messages[batch.messages.length - 1].cwd;
+          if (cwd) lastCwd = cwd;
+          await this.processObservationBatch(
+            session,
+            batch.messages as Array<{
+              type: 'observation';
+              prompt_number?: number;
+              tool_name?: string;
+              tool_input?: unknown;
+              tool_response?: unknown;
+              cwd?: string;
+              agentId?: string;
+              agentType?: string;
+              toolUseId?: string;
+            }>,
+            worker,
+            config,
+            session.earliestPendingTimestamp,
+            lastCwd
+          );
+        }
       }
-      const originalTimestamp = session.earliestPendingTimestamp;
+    } else {
+      for await (const message of this.sessionManager.getMessageIterator(session.sessionDbId)) {
+        session.pendingAgentId = message.agentId ?? null;
+        session.pendingAgentType = message.agentType ?? null;
 
-      if (message.type === 'observation') {
-        await this.processObservationMessage(session, message, worker, config, originalTimestamp, lastCwd);
-      } else if (message.type === 'summarize') {
-        await this.processSummaryMessage(session, message, worker, config, mode, originalTimestamp, lastCwd);
+        if (message.cwd) {
+          lastCwd = message.cwd;
+        }
+        const originalTimestamp = session.earliestPendingTimestamp;
+
+        if (message.type === 'observation') {
+          await this.processObservationMessage(session, message, worker, config, originalTimestamp, lastCwd);
+        } else if (message.type === 'summarize') {
+          await this.processSummaryMessage(session, message, worker, config, mode, originalTimestamp, lastCwd);
+        }
       }
+    }
+  }
+
+  private _parsePositiveInt(raw: string | undefined, fallback: number): number {
+    if (raw == null || raw === '') return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  }
+
+  private async processObservationBatch(
+    session: ActiveSession,
+    messages: Array<{
+      type: 'observation';
+      prompt_number?: number;
+      tool_name?: string;
+      tool_input?: unknown;
+      tool_response?: unknown;
+      cwd?: string;
+      agentId?: string;
+      agentType?: string;
+      toolUseId?: string;
+    }>,
+    worker: WorkerRef | undefined,
+    config: TConfig,
+    originalTimestamp: number | null,
+    lastCwd: string | undefined
+  ): Promise<void> {
+    if (!session.memorySessionId) {
+      throw new Error('Cannot process observation batch: memorySessionId not yet captured.');
+    }
+
+    const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+    const outputLang = settings.LLM_MEM_OUTPUT_LANGUAGE;
+
+    const chunks: Array<{
+      tool_name: string;
+      tool_input: unknown;
+      tool_response: unknown;
+      created_at_epoch: number;
+      cwd?: string;
+    }> = messages.map(msg => ({
+      tool_name: msg.tool_name || 'unknown',
+      tool_input: JSON.stringify(msg.tool_input),
+      tool_response: JSON.stringify(msg.tool_response),
+      created_at_epoch: msg.prompt_number ? originalTimestamp ?? Date.now() : Date.now(),
+      cwd: msg.cwd
+    }));
+
+    const batchPrompt = buildObservationBatchPrompt(chunks, { language: outputLang });
+    const responseContext = snapshotResponseContext(session);
+
+    logger.info('SDK', 'batch obsPrompt raw (first 600 chars)', {
+      sessionId: session.sessionDbId,
+      lang: outputLang,
+      batchSize: chunks.length,
+      batchPromptHead: batchPrompt.length > 600 ? batchPrompt.slice(0, 600) : batchPrompt,
+      batchPromptLength: batchPrompt.length
+    });
+
+    session.conversationHistory.push({ role: 'user', content: batchPrompt });
+    session.lastPromptSentAt = Date.now();
+    session.lastGeneratorSource = 'ingest';
+    const batchResponse = await this.query(session.conversationHistory, config);
+
+    let tokensUsed = 0;
+    let inputTokens: number | null = null;
+    let outputTokens: number | null = null;
+    if (batchResponse.content) {
+      session.conversationHistory.push({ role: 'assistant', content: batchResponse.content });
+      tokensUsed = batchResponse.tokensUsed || 0;
+      session.cumulativeInputTokens += Math.floor(tokensUsed * 0.7);
+      session.cumulativeOutputTokens += Math.floor(tokensUsed * 0.3);
+      inputTokens = batchResponse.inputTokens ?? null;
+      outputTokens = batchResponse.outputTokens ?? null;
+      session.lastUsage = this.buildLastUsage(batchResponse);
+    }
+
+    // When batching is on, a single LLM call produced the batch → attribute the
+    // real input/output tokens to the LAST observation of the batch (per user
+    // decision #3b). Non-batch callers (processObservationMessage / init /
+    // summary) keep the default 'all' attribution.
+    const tokenMode = chunks.length >= 2 ? 'last_only' : 'all';
+
+    if (batchResponse.content || this.forwardEmptyMessageResponse) {
+      await processAgentResponse(
+        batchResponse.content || '', session, this.dbManager, this.sessionManager,
+        worker, tokensUsed, originalTimestamp, this.providerName, chunks[chunks.length - 1].cwd, batchResponse.servedModel ?? config.model, responseContext,
+        inputTokens, outputTokens,
+        tokenMode as 'all' | 'last_only'
+      );
+    } else {
+      logger.warn('SDK', `Empty ${this.providerName} batch observation response (${chunks.length} obs), leaving batch intact`, {
+        sessionId: session.sessionDbId,
+        batchSize: chunks.length
+      });
     }
   }
 
