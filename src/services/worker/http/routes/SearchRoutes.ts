@@ -381,7 +381,7 @@ export class SearchRoutes extends BaseRouteHandler {
 
     logger.info('HTTP', 'DIAG semantic context', { query_len: query.length, project, limit, query });
 
-    if (!query || query.length < 20) {
+    if (!query) {
       res.json({ context: '', count: 0, threshold: 0, results: [] });
       return;
     }
