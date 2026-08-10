@@ -206,8 +206,9 @@ export function SettingsModal({
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [customEmbedMode, setCustomEmbedMode] = useState(false);
 
-  // Poll rebuild status every 2s whenever modal is open
+  // Poll rebuild status every 2s while modal is open
   useEffect(() => {
+    if (!isOpen) return;
     let cancelled = false;
     const poll = async () => {
       try {
@@ -237,7 +238,7 @@ export function SettingsModal({
     const timer = setInterval(poll, 2000);
     poll(); // immediate first check
     return () => { cancelled = true; clearInterval(timer); };
-  }, []);
+  }, [isOpen]);
 
   const handleRebuild = async () => {
     setRebuildStatus('正在重算向量…');
