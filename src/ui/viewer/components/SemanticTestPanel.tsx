@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { API_ENDPOINTS } from '../constants/api';
 
-export interface SemanticTestPanelProps {
+interface SemanticTestPanelProps {
   projects: string[];
   currentProject: string;
+  minChars?: number;
 }
 
 interface TestResult {
@@ -25,16 +26,23 @@ interface TestResult {
   message?: string;
 }
 
-export function SemanticTestPanel({ projects, currentProject }: SemanticTestPanelProps) {
+export function SemanticTestPanel({ projects, currentProject, minChars: minCharsProp }: SemanticTestPanelProps) {
   const initialProject = currentProject || (projects.length > 0 ? projects[0] : '');
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState(initialProject);
   const [limit, setLimit] = useState('5');
   const [result, setResult] = useState<TestResult>({ status: 'idle', context: '', count: 0 });
+  const minChars =
+    typeof minCharsProp === 'number' && Number.isFinite(minCharsProp)
+      ? Math.max(0, minCharsProp)
+      : 20;
 
   const handleTest = useCallback(async () => {
-    if (!query.trim() || query.trim().length < 20) {
-      setResult({ status: 'error', context: '', count: 0, message: '提示词太短，至少 20 个字符' });
+    if (!query.trim() || query.trim().length < minChars) {
+      const msg = minChars === 0
+        ? '请输入提示词'
+        : `提示词太短，至少 ${minChars} 个字符`;
+      setResult({ status: 'error', context: '', count: 0, message: msg });
       return;
     }
     setResult({ status: 'loading', context: '', count: 0 });

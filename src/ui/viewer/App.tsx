@@ -131,6 +131,10 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFilter]);
 
+  const minChars = Number.isFinite(Number(settings.LLM_MEM_SEMANTIC_INJECT_MIN_CHARS))
+    ? Number(settings.LLM_MEM_SEMANTIC_INJECT_MIN_CHARS)
+    : 20;
+
   return (
     <div className="app-container">
       <Header
@@ -172,7 +176,7 @@ export function App() {
             )}
           </>
         ) : (
-          <SemanticTestPanel projects={projects} currentProject={currentFilter} />
+          <SemanticTestPanel projects={projects} currentProject={currentFilter} minChars={minChars} />
         )}
       </div>
 
