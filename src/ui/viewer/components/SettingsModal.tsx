@@ -206,10 +206,9 @@ export function SettingsModal({
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [customEmbedMode, setCustomEmbedMode] = useState(false);
 
-  // Poll rebuild status every 2s while running; recover on modal open
+  // Poll rebuild status every 2s whenever modal is open
   useEffect(() => {
     let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | undefined;
     const poll = async () => {
       try {
         const res = await fetch('/api/vector/rebuild/progress');
@@ -222,11 +221,10 @@ export function SettingsModal({
           if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
           parts.push('）');
           setRebuildStatus(parts.join(''));
-          timer = setInterval(poll, 2000);
-        } else if (data.status === 'done' || (data.vectorized > 0 && data.vectorized === data.total)) {
+        } else if (data.status === 'done') {
           setIsRebuilding(false);
-          const parts = ['重算完成，已重建 ' + (data.vectorized ?? '?') + ' 条'];
-          if (data.failed > 0) parts.push(`，${data.failed} 条失败`);
+          const parts = ['重算完成，重建 ' + (data.rebuilt ?? '?') + ' 条'];
+          if (data.skipped > 0) parts.push('，跳过 ' + data.skipped + ' 条');
           setRebuildStatus(parts.join(''));
         } else if (data.status === 'failed') {
           setIsRebuilding(false);
@@ -236,8 +234,9 @@ export function SettingsModal({
         }
       } catch { /* server not ready */ }
     };
-    poll();
-    return () => { cancelled = true; if (timer) clearInterval(timer); };
+    const timer = setInterval(poll, 2000);
+    poll(); // immediate first check
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
   const handleRebuild = async () => {
@@ -424,7 +423,7 @@ export function SettingsModal({
               value={draft.LLM_MEM_DISABLE_VECTOR_SEARCH ?? 'false'}
               onChange={v => set('LLM_MEM_DISABLE_VECTOR_SEARCH', v)} />
             <div className="settings-field" style={{ padding: '8px 10px', marginTop: 8, borderTop: '1px solid var(--color-border-secondary)' }}>
-              <button className="btn-warning" onClick={handleRebuild} type="button"
+              <button className="btn-warning" onClick={handleRebuild} type="button" disabled={isRebuilding}
                 style={{ width: '100%', padding: '8px 0', fontSize: 13 }}>
                 全量重算向量
               </button>

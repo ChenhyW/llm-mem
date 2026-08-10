@@ -162,6 +162,42 @@ def _id_map_path(hnsw_dir: str) -> str:
     return os.path.join(hnsw_dir, "id-map.json")
 
 
+def _progress_path(hnsw_dir: str) -> str:
+    return os.path.join(hnsw_dir, "build-progress.json")
+
+
+def write_build_progress(hnsw_dir: str, processed: int, total: int, rebuilt: int, skipped: int, failed: int, errors: list[str]) -> None:
+    """Write a lightweight progress file so the worker can report live progress
+    during a rebuild.  Cheap JSON (a few ints) — unlike the full id-map, this is
+    safe to write on every row."""
+    try:
+        tmp = _progress_path(hnsw_dir) + ".tmp"
+        with open(tmp, "w") as f:
+            json.dump(
+                {
+                    "processed": processed,
+                    "total": total,
+                    "rebuilt": rebuilt,
+                    "skipped": skipped,
+                    "failed": failed,
+                    "errors": errors[:5],
+                },
+                f,
+            )
+        os.replace(tmp, _progress_path(hnsw_dir))
+    except Exception:
+        pass  # progress reporting is best-effort
+
+
+def clear_build_progress(hnsw_dir: str) -> None:
+    try:
+        p = _progress_path(hnsw_dir)
+        if os.path.exists(p):
+            os.remove(p)
+    except Exception:
+        pass
+
+
 def _vec_path(hnsw_dir: str) -> str:
     return os.path.join(hnsw_dir, "vectors.npy")
 
@@ -385,11 +421,14 @@ def cmd_build(args):
         if isinstance(v, dict) and "sqlite_id" in v:
             old_by_db_id[int(v["sqlite_id"])] = (int(k), v)
 
-    # ── Phase 1: incremental embed & save id-map per-row ──
+    # ── Phase 1: incremental embed (write lightweight progress per row) ──
     by_label: dict[int, dict] = {}
     new_vecs: list[list[float]] = []   # vectors for newly embedded rows (in order)
     need_rebuild = 0
     skipped = 0
+    failed_count = 0
+    errors: list[str] = []
+    total = len(rows)
 
     for label, row in enumerate(rows):
         db_id = int(row["sqlite_id"])
@@ -425,8 +464,11 @@ def cmd_build(args):
                 else:
                     meta["status"] = "failed"
                     meta["vector_error"] = "re-embed (vector missing on disk) returned None"
+                    failed_count += 1
+                    errors.append(meta["vector_error"])
                 by_label[label] = meta
             skipped += 1
+            write_build_progress(hnsw_dir, label + 1, total, need_rebuild, skipped, failed_count, errors)
             continue
 
         # Need to (re)embed this row
@@ -438,7 +480,10 @@ def cmd_build(args):
         else:
             meta["status"] = "failed"
             meta["vector_error"] = "embed returned None or failed"
+            failed_count += 1
+            errors.append(meta["vector_error"])
         by_label[label] = meta
+        write_build_progress(hnsw_dir, label + 1, total, need_rebuild, skipped, failed_count, errors)
 
     # ── Phase 2: build hnsw index from vectorized entries ──
     final_vecs: list[list[float]] = []
@@ -465,6 +510,7 @@ def cmd_build(args):
         new_label += 1
 
     if not final_vecs:
+        clear_build_progress(hnsw_dir)
         print(json.dumps({"built": False, "reason": "no vectorized rows", "total": len(rows)}))
         return
 
@@ -481,8 +527,7 @@ def cmd_build(args):
 
     _save_vector_bin(hnsw_dir, np.array(final_vecs, dtype=np.float32))
     save_id_map(hnsw_dir, final_id_map)
-
-    failed_count = sum(1 for v in final_id_map.values() if v.get("status") == "failed")
+    clear_build_progress(hnsw_dir)
     print(json.dumps(
         {"built": True, "elements": len(final_vecs), "dim": dim, "total": len(rows), "failed": failed_count, "rebuilt": need_rebuild, "skipped": skipped}
     ))

@@ -590,7 +590,14 @@ export class DataRoutes extends BaseRouteHandler {
 
   private handleRebuildProgress = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {
     try {
-      // total = rows in metadata_observations
+      const { join } = await import('path');
+      const { homedir } = await import('os');
+      const { readFileSync, existsSync } = await import('fs');
+      const dataDir = process.env.LLM_MEM_DATA_DIR || join(homedir(), '.llm-mem');
+      const hnswDir = join(dataDir, 'hnswlib');
+      const progressPath = join(hnswDir, 'build-progress.json');
+
+      // total = rows in metadata_observations (fallback to progress file total)
       let total = 0;
       try {
         const { DB_PATH } = await import('../../../../shared/paths.js');
@@ -600,36 +607,51 @@ export class DataRoutes extends BaseRouteHandler {
         db.close();
       } catch { /* total stays 0 */ }
 
-      // vectorized / failed = id-map.json entries
       let vectorized = 0;
       let failed = 0;
+      let rebuilt = 0;
+      let skipped = 0;
       const errors: string[] = [];
-      try {
-        const { join } = await import('path');
-        const { homedir } = await import('os');
-        const { readFileSync } = await import('fs');
-        const dataDir = process.env.LLM_MEM_DATA_DIR || join(homedir(), '.llm-mem');
-        const idMapPath = join(dataDir, 'hnswlib', 'id-map.json');
-        const idMap = JSON.parse(readFileSync(idMapPath, 'utf-8'));
-        for (const v of Object.values(idMap) as Array<Record<string, unknown>>) {
-          if (v.status === 'failed') {
-            failed++;
-            if (typeof v.vector_error === 'string' && errors.length < 5) errors.push(v.vector_error);
-          } else {
-            vectorized++;
+
+      // If a rebuild is in progress, prefer the live progress file (written per row).
+      if (existsSync(progressPath)) {
+        try {
+          const p = JSON.parse(readFileSync(progressPath, 'utf-8'));
+          total = Number(p.total ?? total);
+          vectorized = Number(p.processed ?? 0);
+          failed = Number(p.failed ?? 0);
+          rebuilt = Number(p.rebuilt ?? 0);
+          skipped = Number(p.skipped ?? 0);
+          if (Array.isArray(p.errors)) errors.push(...p.errors.slice(0, 5));
+        } catch { /* ignore malformed progress file */ }
+      } else {
+        // vectorized / failed = id-map.json entries
+        try {
+          const idMapPath = join(hnswDir, 'id-map.json');
+          if (existsSync(idMapPath)) {
+            const idMap = JSON.parse(readFileSync(idMapPath, 'utf-8'));
+            for (const v of Object.values(idMap) as Array<Record<string, unknown>>) {
+              if (v.status === 'failed') {
+                failed++;
+                if (typeof v.vector_error === 'string' && errors.length < 5) errors.push(v.vector_error);
+              } else {
+                vectorized++;
+              }
+            }
           }
-        }
-      } catch { /* id-map missing → zeros */ }
+        } catch { /* id-map missing → zeros */ }
+      }
 
       const running = rebuildStatus.status === 'running';
+      const status = running ? 'running' : rebuildStatus.status === 'failed' ? 'failed' : rebuildStatus.status === 'done' ? 'done' : 'idle';
       res.json({
-        status: running ? 'running' : 'idle',
+        status,
         total,
         vectorized,
         failed,
         errors,
-        rebuilt: rebuildStatus.rebuilt ?? 0,
-        skipped: rebuildStatus.skipped ?? 0,
+        rebuilt: running ? rebuilt : rebuildStatus.rebuilt ?? rebuilt,
+        skipped: running ? skipped : rebuildStatus.skipped ?? skipped,
         startedAt: rebuildStatus.startedAt,
       });
     } catch (error) {
