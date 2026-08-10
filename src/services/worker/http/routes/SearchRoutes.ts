@@ -387,17 +387,22 @@ export class SearchRoutes extends BaseRouteHandler {
     }
 
     let result: any;
-    let minScore = 0.75;
+    let minScore: number = 0.75;
     try {
       const settings = this.getCachedSettings() as any;
       minScore = parseFloat(settings?.['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE'] ?? '0.75');
+      const minChars = parseInt(settings?.['LLM_MEM_SEMANTIC_INJECT_MIN_CHARS'] ?? '20', 10) || 20;
+      if (query.length < minChars) {
+        res.json({ context: '', count: 0, threshold: minScore, results: [] });
+        return;
+      }
       result = await this.searchManager.search({
         query,
         type: 'observations',
         project,
         limit: String(limit),
         format: 'json',
-        minScore: 0, // fetch all results; we'll filter & display scores ourselves
+        minScore: 0,
         ...(platformSource ? { platformSource } : {}),
       });
     } catch (error) {

@@ -51,6 +51,7 @@ export interface SettingsDefaults {
   LLM_MEM_SEMANTIC_INJECT: string;        
   LLM_MEM_SEMANTIC_INJECT_LIMIT: string;  
   LLM_MEM_SEMANTIC_INJECT_MIN_SCORE: string;  
+  LLM_MEM_SEMANTIC_INJECT_MIN_CHARS: string;
   LLM_MEM_TIER_ROUTING_ENABLED: string;
   LLM_MEM_TIER_SIMPLE_MODEL: string;
   LLM_MEM_TIER_SUMMARY_MODEL: string;
@@ -150,6 +151,7 @@ export class SettingsDefaultsManager {
     LLM_MEM_SEMANTIC_INJECT: 'false',             // Inject relevant past observations on every UserPromptSubmit (experimental, disabled by default)
     LLM_MEM_SEMANTIC_INJECT_LIMIT: '5',           // Top-N most relevant observations to inject per prompt
     LLM_MEM_SEMANTIC_INJECT_MIN_SCORE: '0.75',    // Minimum similarity score (0-1) for injected results
+    LLM_MEM_SEMANTIC_INJECT_MIN_CHARS: '20',    // Minimum prompt character count before semantic injection
     LLM_MEM_TIER_ROUTING_ENABLED: 'true',         // Route observations to models by complexity
     LLM_MEM_TIER_SIMPLE_MODEL: 'haiku', // Portable tier alias — works across Direct API, Bedrock, Vertex, Azure (see #1463)
     LLM_MEM_TIER_SUMMARY_MODEL: '',                // Empty = use default model for summaries

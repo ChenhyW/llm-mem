@@ -146,35 +146,37 @@ export const sessionInitHandler: EventHandler = {
 
     let additionalContext = '';
 
-    if (semanticInject && prompt && prompt.length >= 20 && prompt !== '[media prompt]') {
-      const limit = settings.LLM_MEM_SEMANTIC_INJECT_LIMIT || '5';
-      const semanticResult = await dependencies.executeWithWorkerFallback<SemanticContextResponse>(
-        '/api/context/semantic',
-        'POST',
-        { q: prompt, project, limit, platformSource },
-      );
-      if (!dependencies.isWorkerFallback(semanticResult) && semanticResult?.context) {
-        logger.debug('HOOK', `Semantic injection: ${semanticResult.count} observations for prompt`, { sessionId: sessionDbId, count: semanticResult.count });
-        additionalContext = semanticResult.context;
+    if (semanticInject && prompt && prompt !== '[media prompt]') {
+      const minChars = Number(settings.LLM_MEM_SEMANTIC_INJECT_MIN_CHARS || '20');
+      if (prompt.length < minChars) {
+        logger.debug('HOOK', 'Semantic injection skipped: prompt too short', { promptLength: prompt.length, minChars });
+      } else {
+        const limit = settings.LLM_MEM_SEMANTIC_INJECT_LIMIT || '5';
+        const semanticResult = await dependencies.executeWithWorkerFallback<SemanticContextResponse>(
+          '/api/context/semantic',
+          'POST',
+          { q: prompt, project, limit, platformSource },
+        );
+        if (!dependencies.isWorkerFallback(semanticResult) && semanticResult?.context) {
+          logger.debug('HOOK', `Semantic injection: ${semanticResult.count} observations for prompt`, { sessionId: sessionDbId, count: semanticResult.count });
+          additionalContext = semanticResult.context;
 
-        // Persist the injected semantic context onto the prompt record so the UI
-        // can surface it in the PromptCard.  Fire-and-forget: a failure must not
-        // block normal injection.
-        try {
-          await dependencies.executeWithWorkerFallback(
-            '/api/prompts/semantic-context',
-            'POST',
-            {
-              sessionDbId: Number(sessionDbId),
-              promptNumber: Number(promptNumber),
-              semanticContext: additionalContext,
-            },
-          );
-        } catch (err) {
-          logger.warn('HOOK', 'Failed to persist semantic context for prompt', {
-            sessionId: sessionDbId,
-            promptNumber
-          }, err as Error);
+          try {
+            await dependencies.executeWithWorkerFallback(
+              '/api/prompts/semantic-context',
+              'POST',
+              {
+                sessionDbId: Number(sessionDbId),
+                promptNumber: Number(promptNumber),
+                semanticContext: additionalContext,
+              },
+            );
+          } catch (err) {
+            logger.warn('HOOK', 'Failed to persist semantic context for prompt', {
+              sessionId: sessionDbId,
+              promptNumber
+            }, err as Error);
+          }
         }
       }
     }

@@ -476,6 +476,10 @@ export function SettingsModal({
                 <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_SCORE ?? '0.75'}
                   onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_SCORE', v)} />
               </Field>
+              <Field label="最短提示词字符数" tooltip="提示词长度 ≥ 此值才触发语义注入（默认 20），低于此值直接跳过。（无需重启，下次注入生效）">
+                <TextField value={draft.LLM_MEM_SEMANTIC_INJECT_MIN_CHARS ?? '20'}
+                  onChange={v => set('LLM_MEM_SEMANTIC_INJECT_MIN_CHARS', v)} />
+              </Field>
             </CollapsibleSection>
             <CollapsibleSection title="显示选项">
               <ToggleField label="显示读取 token 数"
