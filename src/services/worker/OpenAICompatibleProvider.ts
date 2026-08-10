@@ -286,7 +286,9 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
         batchResponse.content || '', session, this.dbManager, this.sessionManager,
         worker, tokensUsed, originalTimestamp, this.providerName, chunks[chunks.length - 1].cwd, batchResponse.servedModel ?? config.model, responseContext,
         inputTokens, outputTokens,
-        tokenMode as 'all' | 'last_only'
+        tokenMode as 'all' | 'last_only',
+        chunks.length,
+        1
       );
     } else {
       logger.warn('SDK', `Empty ${this.providerName} batch observation response (${chunks.length} obs), leaving batch intact`, {

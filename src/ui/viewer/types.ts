@@ -19,6 +19,8 @@ export interface Observation {
   discovery_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
+  batch_size?: number;
+  batch_index?: number;
 }
 
 export interface Summary {

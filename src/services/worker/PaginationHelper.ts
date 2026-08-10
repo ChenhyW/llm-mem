@@ -75,7 +75,9 @@ export class PaginationHelper {
         o.created_at_epoch,
         o.discovery_tokens,
         o.input_tokens,
-        o.output_tokens
+        o.output_tokens,
+        o.batch_size,
+        o.batch_index
       FROM observations o
       LEFT JOIN sdk_sessions s ON o.memory_session_id = s.memory_session_id
     `;

@@ -34,6 +34,8 @@ export interface ObservationRecord {
   concept?: string;
   prompt_number?: number;
   discovery_tokens?: number;
+  batch_size?: number;
+  batch_index?: number;
 }
 
 export interface SessionSummaryRecord {

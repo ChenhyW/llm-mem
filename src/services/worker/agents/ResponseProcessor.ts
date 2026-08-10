@@ -287,7 +287,9 @@ export async function processAgentResponse(
   responseContext?: ResponseContext,
   inputTokens?: number | null,
   outputTokens?: number | null,
-  tokenMode: 'all' | 'last_only' = 'all'
+  tokenMode: 'all' | 'last_only' = 'all',
+  batchSize: number = 1,
+  batchIndexOffset: number = 1
 ): Promise<void> {
   const processingStartedAt = Date.now();
   session.lastGeneratorActivity = Date.now();
@@ -406,18 +408,20 @@ export async function processAgentResponse(
   let result: ReturnType<typeof sessionStore.storeObservations>;
   try {
     result = sessionStore.storeObservations(
-      session.memorySessionId,
-      context.project,
-      labeledObservations,
-      summaryForStore,
-      context.promptNumber,
-      discoveryTokens,
-      originalTimestamp ?? undefined,
-      modelId,
-      inputTokens,
-      outputTokens,
-      tokenMode
-    );
+            session.memorySessionId,
+            context.project,
+            labeledObservations,
+            summaryForStore,
+            context.promptNumber,
+            discoveryTokens,
+            originalTimestamp ?? undefined,
+            modelId,
+            inputTokens,
+            outputTokens,
+            tokenMode,
+            batchSize,
+            batchIndexOffset
+          );
   } finally {
     session.pendingAgentId = null;
     session.pendingAgentType = null;
@@ -504,19 +508,21 @@ export async function processAgentResponse(
   });
 
   await syncAndBroadcastObservations(
-    labeledObservations,
-    result,
-    session,
-    context,
-    dbManager,
-    worker,
-    agentName,
-    projectRoot,
-    discoveryTokens,
-    inputTokens,
-    outputTokens,
-    tokenMode
-  );
+        labeledObservations,
+        result,
+        session,
+        context,
+        dbManager,
+        worker,
+        agentName,
+        projectRoot,
+        discoveryTokens,
+        inputTokens,
+        outputTokens,
+        tokenMode,
+        batchSize,
+        batchIndexOffset
+      );
 
   await syncAndBroadcastSummary(
     summary,
@@ -566,7 +572,9 @@ async function syncAndBroadcastObservations(
   discoveryTokens: number = 0,
   inputTokens?: number | null,
   outputTokens?: number | null,
-  tokenMode: 'all' | 'last_only' = 'all'
+  tokenMode: 'all' | 'last_only' = 'all',
+  batchSize: number = 1,
+  batchIndexOffset: number = 1
 ): Promise<void> {
   const memorySessionId = session.memorySessionId;
   if (!memorySessionId) {
@@ -586,7 +594,8 @@ async function syncAndBroadcastObservations(
   const isLastOnly = tokenMode === 'last_only' && uniqueObservationIds.length > 1;
   const lastUniqueObsId = uniqueObservationIds[uniqueObservationIds.length - 1];
 
-  for (const obsId of uniqueObservationIds) {
+  for (let batchObsIdx = 0; batchObsIdx < uniqueObservationIds.length; batchObsIdx++) {
+    const obsId = uniqueObservationIds[batchObsIdx];
     const observationIndex = result.observationIds.indexOf(obsId);
     const obs = observations[observationIndex];
     if (!obs) {
@@ -626,6 +635,11 @@ async function syncAndBroadcastObservations(
     dbManager.getCloudSync()?.notify();
 
     const isLastObs = !isLastOnly || obsId === lastUniqueObsId;
+    // Batch-attribution mirrors storeObservations: every observation in the
+    // batch carries the same batchSize; batchIndex is per-observation, offset
+    // by batchIndexOffset (defaults to 1 for single-mode so the badge stays
+    // hidden when batchSize==1).
+    const thisBatchIndex = batchIndexOffset + batchObsIdx;
     broadcastObservation(worker, {
       id: obsId,
       memory_session_id: session.memorySessionId,
@@ -645,7 +659,9 @@ async function syncAndBroadcastObservations(
       created_at_epoch: result.createdAtEpoch,
       discovery_tokens: discoveryTokens,
       input_tokens: isLastObs ? (inputTokens ?? undefined) : 0,
-      output_tokens: isLastObs ? (outputTokens ?? undefined) : 0
+      output_tokens: isLastObs ? (outputTokens ?? undefined) : 0,
+      batch_size: batchSize,
+      batch_index: thisBatchIndex
     });
   }
 

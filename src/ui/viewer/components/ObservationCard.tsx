@@ -132,6 +132,25 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel }: Obs
             {tokens}
           </span>
         )}
+        {(observation.batch_size ?? 0) > 1 && (
+          <span
+            title={`批次产出 · 第 ${observation.batch_index ?? 1}/${observation.batch_size} 条`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+              background: 'rgba(56,189,248,0.14)',
+              color: '#38bdf8',
+            }}
+          >
+            <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
+              <rect x="0" y="0" width="4" height="4" fill="currentColor"/>
+              <rect x="6" y="0" width="4" height="4" fill="currentColor"/>
+              <rect x="0" y="6" width="4" height="4" fill="currentColor"/>
+              <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
+            </svg>
+            批 {observation.batch_index ?? 1}/{observation.batch_size}
+          </span>
+        )}
         {vectorizedIds !== undefined && (
           <span
             title={vectorizedIds.includes(observation.id) ? '已向量化' : '未向量化'}

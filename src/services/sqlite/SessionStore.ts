@@ -123,6 +123,7 @@ export class SessionStore {
     this.initializeSyncHubLaunchBaseline();
     this.normalizeConceptTags();
     this.ensureLLMTokensColumns();
+    this.ensureObservationBatchColumns();
   }
 
   private getIndexColumns(indexName: string): string[] {
@@ -1373,6 +1374,37 @@ export class SessionStore {
     }
 
     this.db.prepare('INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)').run(55, new Date().toISOString());
+  }
+
+  /**
+   * v56: batch-attribution metadata for observations.  When observation
+   * batching compresses N observations into a single LLM call, stamp each row
+   * with the batch it belonged to (batch_size = N, batch_index = position 0..N-1)
+   * so the UI can visually distinguish "produced as a batch" from
+   * single-observation calls.  Default '1' for both keeps historical rows
+   * (batch_size=1, batch_index=1) indistinguishable from single-mode writes
+   * from the store's POV — the UI only shows the batch badge when
+   * batch_size > 1.  Only the observations table needs these columns;
+   * session_summaries keep the '1'/'1' defaults.
+   *
+   * Same shape as ensureLLMTokensColumns: hasColumn guards make this fully
+   * idempotent on repeated boots.
+   */
+  private ensureObservationBatchColumns(): void {
+    const applied = this.db.prepare('SELECT version FROM schema_versions WHERE version = ?').get(56) as SchemaVersion | undefined;
+    if (applied) return;
+
+    const obsInfo = this.db.query('PRAGMA table_info(observations)').all() as TableColumnInfo[];
+    if (!obsInfo.some(col => col.name === 'batch_size')) {
+      this.db.run('ALTER TABLE observations ADD COLUMN batch_size INTEGER DEFAULT 1');
+      logger.debug('DB', 'Added batch_size column to observations table');
+    }
+    if (!obsInfo.some(col => col.name === 'batch_index')) {
+      this.db.run('ALTER TABLE observations ADD COLUMN batch_index INTEGER DEFAULT 1');
+      logger.debug('DB', 'Added batch_index column to observations table');
+    }
+
+    this.db.prepare('INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)').run(56, new Date().toISOString());
   }
 
   private createPendingMessagesTable(): void {
@@ -2709,7 +2741,9 @@ export class SessionStore {
     generatedByModel?: string,
     inputTokens?: number | null,
     outputTokens?: number | null,
-    tokenMode: 'all' | 'last_only' = 'all'
+    tokenMode: 'all' | 'last_only' = 'all',
+    batchSize: number = 1,
+    batchIndex: number = 1
   ): { observationIds: number[]; summaryId: number | null; createdAtEpoch: number } {
     const timestampEpoch = overrideTimestampEpoch ?? Date.now();
     const timestampIso = new Date(timestampEpoch).toISOString();
@@ -2727,22 +2761,34 @@ export class SessionStore {
       const observationIds: number[] = [];
 
       const obsStmt = this.db.prepare(`
-        INSERT INTO observations
-        (memory_session_id, project, type, title, subtitle, facts, narrative, concepts,
-         files_read, files_modified, prompt_number, discovery_tokens, input_tokens, output_tokens,
-         agent_type, agent_id, content_hash, created_at, created_at_epoch,
-         generated_by_model, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(memory_session_id, content_hash) DO NOTHING
-        RETURNING id
-      `);
+                INSERT INTO observations
+                (memory_session_id, project, type, title, subtitle, facts, narrative, concepts,
+                 files_read, files_modified, prompt_number, discovery_tokens, input_tokens, output_tokens,
+                 agent_type, agent_id, content_hash, created_at, created_at_epoch,
+                 generated_by_model, metadata, batch_size, batch_index)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(memory_session_id, content_hash) DO NOTHING
+                RETURNING id
+              `);
       const lookupExistingStmt = this.db.prepare(
         'SELECT id FROM observations WHERE memory_session_id = ? AND content_hash = ?'
       );
 
       for (let obsIdx = 0; obsIdx < obsCount; obsIdx++) {
         const observation = observations[obsIdx];
-        const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
+        // batch_size / batch_index go into the content hash so an identical
+        // observation emitted in a different batch is NOT collapsed onto the
+        // same row (its batch-attribution metadata would be wrong). Default
+        // batchSize=1, batchIndex=1 keeps pre-batch and single-mode rows
+        // indistinguishable at the hash level.
+        const effectiveBatchSize = Math.max(1, batchSize);
+        const effectiveBatchIndex = Math.max(0, batchIndex + obsIdx);
+        const contentHash = computeObservationContentHash(
+          memorySessionId,
+          observation.title,
+          observation.narrative,
+          `${effectiveBatchSize}:${effectiveBatchIndex}`
+        );
         const isLastObs = obsIdx === obsCount - 1;
         const inputTokensThis = (isLastOnly && !isLastObs) ? 0 : (inputTokens ?? 0);
         const outputTokensThis = (isLastOnly && !isLastObs) ? 0 : (outputTokens ?? 0);
@@ -2767,7 +2813,9 @@ export class SessionStore {
           timestampIso,
           timestampEpoch,
           generatedByModel || null,
-          observation.metadata ?? null
+          observation.metadata ?? null,
+          effectiveBatchSize,
+          effectiveBatchIndex
         ) as { id: number } | null;
 
         if (inserted) {
