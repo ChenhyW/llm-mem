@@ -624,8 +624,10 @@ export class DataRoutes extends BaseRouteHandler {
           skipped = Number(p.skipped ?? 0);
           if (Array.isArray(p.errors)) errors.push(...p.errors.slice(0, 5));
         } catch { /* ignore malformed progress file */ }
-      } else {
-        // vectorized / failed = id-map.json entries
+      } else if (rebuildStatus.status !== 'running') {
+        // No active build → read from the on-disk id-map.
+        // (When a build IS running and the progress file doesn't exist yet, we
+        // return 0 so the frontend doesn't show stale values from a previous build.)
         try {
           const idMapPath = join(hnswDir, 'id-map.json');
           if (existsSync(idMapPath)) {

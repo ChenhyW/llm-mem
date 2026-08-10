@@ -430,6 +430,10 @@ def cmd_build(args):
     errors: list[str] = []
     total = len(rows)
 
+    # Write initial progress immediately so the frontend sees 0/total instead of
+    # stale data from a previous build's id-map.
+    write_build_progress(hnsw_dir, 0, total, 0, 0, 0, [])
+
     for label, row in enumerate(rows):
         db_id = int(row["sqlite_id"])
         meta: dict = {

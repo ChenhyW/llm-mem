@@ -230,9 +230,8 @@ export function SettingsModal({
         } else if (data.status === 'failed') {
           setIsRebuilding(false);
           setRebuildStatus('重算失败：' + (data.error ?? '未知错误'));
-        } else {
-          setIsRebuilding(false);
         }
+        // idle → do nothing (handleRebuild controls isRebuilding)
       } catch { /* server not ready */ }
     };
     const timer = setInterval(poll, 2000);
@@ -241,20 +240,21 @@ export function SettingsModal({
   }, [isOpen]);
 
   const handleRebuild = async () => {
+    setIsRebuilding(true);
     setRebuildStatus('正在重算向量…');
     try {
       const res = await fetch('/api/vector/rebuild', { method: 'POST' });
       const data = await res.json();
       if (data.status === 'started') {
-        setIsRebuilding(true);
         setRebuildStatus('正在重算向量…');
       } else if (data.status === 'running') {
-        setIsRebuilding(true);
         setRebuildStatus('向量重算已在运行中');
       } else {
+        setIsRebuilding(false);
         setRebuildStatus(data.status === 'done' ? '重算完成，已重建 ' + (data.elements ?? '?') + ' 条' : '重算失败：' + (data.error ?? '未知错误'));
       }
     } catch {
+      setIsRebuilding(false);
       setRebuildStatus('重算请求失败');
     }
   };
