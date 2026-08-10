@@ -63,11 +63,15 @@ export function SemanticTestPanel({ projects, currentProject, minChars: minChars
         return;
       }
       const data = await resp.json();
-      if (!data.context || data.context.trim().length === 0) {
-        setResult({ status: 'empty', context: '', count: data.count || 0, total: data.total || 0, threshold: data.threshold, results: data.results || [], message: '未找到相关记忆' });
+      const results = data.results || [];
+      const hasResults = Array.isArray(results) && results.length > 0;
+      const context = data.context || '';
+      if (!hasResults && !context) {
+        setResult({ status: 'empty', context: '', count: 0, total: data.total || 0, threshold: data.threshold, results: [], message: '未找到相关记忆' });
         return;
       }
-      setResult({ status: 'ok', context: data.context, count: data.count || 0, total: data.total || 0, threshold: data.threshold, results: data.results || [] });
+      const count = data.count || (hasResults ? results.length : 0);
+      setResult({ status: 'ok', context: context, count: count, total: data.total || (hasResults ? results.length : 0), threshold: data.threshold, results: results });
     } catch (err) {
       const message = err instanceof Error ? err.message : '请求失败';
       setResult({ status: 'error', context: '', count: 0, message });
@@ -214,7 +218,7 @@ export function SemanticTestPanel({ projects, currentProject, minChars: minChars
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              <span>命中 {result.count}/{result.total ?? result.count} 条（阈值 &ge; {result.threshold}）</span>
+              <span>命中 {result.count} / {result.total ?? result.count} 条（阈值 &ge; {result.threshold}）</span>
             </div>
             <span className="semantic-test-result-meta" style={{ cursor: 'pointer' }} onClick={clearResult}>
               × 清空
