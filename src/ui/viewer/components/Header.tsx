@@ -13,7 +13,9 @@ interface HeaderProps {
   themePreference: ThemePreference;
   onThemeChange: (theme: ThemePreference) => void;
   onSettingsToggle: () => void;
-  onShowHelp?: () => void;
+  appTab: string;
+  onTabChange: (tab: string) => void;
+  tabs: Array<{ key: string; label: string; icon: React.ReactNode }>;
 }
 
 export function Header({
@@ -25,7 +27,9 @@ export function Header({
   themePreference,
   onThemeChange,
   onSettingsToggle,
-  onShowHelp,
+  appTab,
+  onTabChange,
+  tabs,
 }: HeaderProps) {
   useSpinningFavicon(isProcessing);
 
@@ -45,21 +49,21 @@ export function Header({
           </div>
           <span className="logo-text">llm-mem</span>
         </h1>
+        <div className="header-tabs">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              className={`header-tab ${appTab === t.key ? 'active' : ''}`}
+              onClick={() => onTabChange(t.key)}
+              type="button"
+            >
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
       <div className="status">
-        <a
-          href="https://github.com/ChenhyW/llm-mem"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="icon-link"
-          title="文档 / GitHub"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-          </svg>
-        </a>
-        <GitHubStarsButton username="ChenhyW" repo="llm-mem" />
         <select
           value={currentFilter}
           onChange={e => onFilterChange(e.target.value)}
@@ -73,18 +77,6 @@ export function Header({
           preference={themePreference}
           onThemeChange={onThemeChange}
         />
-        <button
-          className="settings-btn"
-          onClick={() => onShowHelp?.()}
-          title="帮助"
-          aria-label="帮助"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-          </svg>
-        </button>
         <button
           className="settings-btn"
           onClick={onSettingsToggle}

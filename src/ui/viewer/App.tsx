@@ -4,7 +4,7 @@ import { Feed } from './components/Feed';
 import { SemanticTestPanel } from './components/SemanticTestPanel';
 import { SettingsModal } from './components/SettingsModal';
 import { LogsDrawer } from './components/LogsModal';
-import { WelcomeCard, getStoredWelcomeDismissed, setStoredWelcomeDismissed } from './components/WelcomeCard';
+import { WelcomeCard, getStoredWelcomeDismissed } from './components/WelcomeCard';
 import { useSSE } from './hooks/useSSE';
 import { useSettings } from './hooks/useSettings';
 import { usePagination } from './hooks/usePagination';
@@ -132,7 +132,6 @@ export function App() {
   }, [currentFilter]);
 
   return (
-    <>
     <div className="app-container">
       <Header
         projects={projects}
@@ -143,25 +142,10 @@ export function App() {
         themePreference={preference}
         onThemeChange={setThemePreference}
         onSettingsToggle={toggleSettings}
-        onShowHelp={() => {
-          setStoredWelcomeDismissed(false);
-          setWelcomeDismissed(false);
-        }}
+        appTab={appTab}
+        onTabChange={(tab) => setAppTab(tab as AppTab)}
+        tabs={TABS}
       />
-
-      <div className="app-tabs">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            className={`app-tab ${appTab === t.key ? 'active' : ''}`}
-            onClick={() => setAppTab(t.key)}
-            type="button"
-          >
-            {t.icon}
-            <span>{t.label}</span>
-          </button>
-        ))}
-      </div>
 
       <div className="app-body">
         {appTab === 'observations' ? (
@@ -221,6 +205,5 @@ export function App() {
         onClose={toggleLogsModal}
       />
     </div>
-    </>
   );
 }

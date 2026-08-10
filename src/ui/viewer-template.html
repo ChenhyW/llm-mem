@@ -1003,6 +1003,38 @@
       padding-top: 1px;
     }
 
+    .header-tabs {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .header-tab {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      cursor: pointer;
+      border-radius: 6px;
+      white-space: nowrap;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .header-tab:hover {
+      color: var(--text-primary);
+      background: var(--color-bg-tertiary);
+    }
+    .header-tab.active {
+      color: var(--text-primary);
+      background: var(--color-bg-tertiary);
+      font-weight: 600;
+    }
+    .header-tab.active svg { color: var(--accent-color, #f0a000); }
+    .header-tab svg { width: 16px; height: 16px; }
+
     .status {
       display: flex;
       align-items: center;
