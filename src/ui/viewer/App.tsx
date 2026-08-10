@@ -188,7 +188,7 @@ export function App() {
             )}
           </>
         ) : (
-          <SemanticTestPanel projects={projects} />
+          <SemanticTestPanel projects={projects} currentProject={currentFilter} />
         )}
       </div>
 

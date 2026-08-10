@@ -3,6 +3,7 @@ import { API_ENDPOINTS } from '../constants/api';
 
 export interface SemanticTestPanelProps {
   projects: string[];
+  currentProject: string;
 }
 
 interface TestResult {
@@ -24,9 +25,8 @@ interface TestResult {
   message?: string;
 }
 
-export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
+export function SemanticTestPanel({ projects, currentProject }: SemanticTestPanelProps) {
   const [query, setQuery] = useState('');
-  const [selectedProject, setSelectedProject] = useState('');
   const [limit, setLimit] = useState('5');
   const [result, setResult] = useState<TestResult>({ status: 'idle', context: '', count: 0 });
 
@@ -39,7 +39,7 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
     const body = {
       q: query.trim(),
       limit: String(limit),
-      ...(selectedProject ? { project: selectedProject } : {}),
+      ...(currentProject ? { project: currentProject } : {}),
     };
     try {
       const resp = await fetch(API_ENDPOINTS.SEMANTIC_CONTEXT, {
@@ -62,7 +62,7 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
       const message = err instanceof Error ? err.message : '请求失败';
       setResult({ status: 'error', context: '', count: 0, message });
     }
-  }, [query, selectedProject, limit]);
+  }, [query, currentProject, limit]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -95,17 +95,12 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
 
       <div className="semantic-test-card">
         <div className="semantic-test-controls">
-          <div className="semantic-test-control">
-            <label>项目</label>
-            <select
-              value={selectedProject}
-              onChange={e => setSelectedProject(e.target.value)}
-              className="semantic-test-select"
-            >
-              <option value="">全部项目</option>
-              {projects.map(p => (<option key={p} value={p}>{p}</option>))}
-            </select>
-          </div>
+          {currentProject && (
+            <div className="semantic-test-control">
+              <label>项目</label>
+              <div className="semantic-test-current-project">{currentProject}</div>
+            </div>
+          )}
           <div className="semantic-test-control">
             <label>注入条数</label>
             <input
