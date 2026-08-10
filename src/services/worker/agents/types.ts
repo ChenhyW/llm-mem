@@ -16,13 +16,16 @@ export interface ObservationSSEPayload {
   subtitle: string | null;
   text: string | null;
   narrative: string | null;
-  facts: string;  
-  concepts: string;  
-  files_read: string;  
-  files_modified: string;  
+  facts: string;
+  concepts: string;
+  files_read: string;
+  files_modified: string;
   project: string;
   prompt_number: number;
   created_at_epoch: number;
+  discovery_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export interface SummarySSEPayload {
@@ -38,6 +41,9 @@ export interface SummarySSEPayload {
   project: string;
   prompt_number: number;
   created_at_epoch: number;
+  discovery_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export type SSEEventPayload =

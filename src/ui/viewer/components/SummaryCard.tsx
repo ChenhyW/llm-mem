@@ -1,6 +1,6 @@
 import React from "react";
 import { Summary } from "../types";
-import { formatDate } from "../utils/formatters";
+import { formatDate, formatTokens } from "../utils/formatters";
 
 interface SummaryCardProps {
   summary: Summary;
@@ -8,6 +8,7 @@ interface SummaryCardProps {
 
 export function SummaryCard({ summary }: SummaryCardProps) {
   const date = formatDate(summary.created_at_epoch);
+  const tokens = formatTokens(summary.discovery_tokens, summary.input_tokens, summary.output_tokens);
 
   const sections = [
     { key: "investigated", label: "Investigated", content: summary.investigated, icon: "/icon-thick-investigated.svg" },
@@ -59,6 +60,12 @@ export function SummaryCard({ summary }: SummaryCardProps) {
         <time className="summary-meta-date" dateTime={new Date(summary.created_at_epoch).toISOString()}>
           {date}
         </time>
+        {tokens && (
+          <span className="summary-meta-divider">•</span>
+        )}
+        {tokens && (
+          <span className="summary-meta-tokens">{tokens}</span>
+        )}
       </footer>
     </article>
   );

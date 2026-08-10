@@ -72,7 +72,10 @@ export class PaginationHelper {
         o.files_modified,
         o.prompt_number,
         o.created_at,
-        o.created_at_epoch
+        o.created_at_epoch,
+        o.discovery_tokens,
+        o.input_tokens,
+        o.output_tokens
       FROM observations o
       LEFT JOIN sdk_sessions s ON o.memory_session_id = s.memory_session_id
     `;
@@ -126,7 +129,10 @@ export class PaginationHelper {
         ss.next_steps,
         ss.project,
         ss.created_at,
-        ss.created_at_epoch
+        ss.created_at_epoch,
+        ss.discovery_tokens,
+        ss.input_tokens,
+        ss.output_tokens
       FROM session_summaries ss
       JOIN sdk_sessions s ON ss.memory_session_id = s.memory_session_id
     `;

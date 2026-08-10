@@ -284,7 +284,9 @@ export async function processAgentResponse(
   agentName: string,
   projectRoot?: string,
   modelId?: string,
-  responseContext?: ResponseContext
+  responseContext?: ResponseContext,
+  inputTokens?: number | null,
+  outputTokens?: number | null
 ): Promise<void> {
   const processingStartedAt = Date.now();
   session.lastGeneratorActivity = Date.now();
@@ -410,7 +412,9 @@ export async function processAgentResponse(
       context.promptNumber,
       discoveryTokens,
       originalTimestamp ?? undefined,
-      modelId
+      modelId,
+      inputTokens,
+      outputTokens
     );
   } finally {
     session.pendingAgentId = null;
@@ -505,7 +509,10 @@ export async function processAgentResponse(
     dbManager,
     worker,
     agentName,
-    projectRoot
+    projectRoot,
+    discoveryTokens,
+    inputTokens,
+    outputTokens
   );
 
   await syncAndBroadcastSummary(
@@ -516,7 +523,10 @@ export async function processAgentResponse(
     context,
     dbManager,
     worker,
-    agentName
+    agentName,
+    discoveryTokens,
+    inputTokens,
+    outputTokens
   );
 }
 
@@ -549,7 +559,10 @@ async function syncAndBroadcastObservations(
   dbManager: DatabaseManager,
   worker: WorkerRef | undefined,
   agentName: string,
-  projectRoot?: string
+  projectRoot?: string,
+  discoveryTokens: number = 0,
+  inputTokens?: number | null,
+  outputTokens?: number | null
 ): Promise<void> {
   const memorySessionId = session.memorySessionId;
   if (!memorySessionId) {
@@ -617,7 +630,10 @@ async function syncAndBroadcastObservations(
       files_modified: JSON.stringify(obs.files_modified || []),
       project: context.project,
       prompt_number: context.promptNumber,
-      created_at_epoch: result.createdAtEpoch
+      created_at_epoch: result.createdAtEpoch,
+      discovery_tokens: discoveryTokens,
+      input_tokens: inputTokens ?? undefined,
+      output_tokens: outputTokens ?? undefined
     });
   }
 
@@ -653,7 +669,10 @@ async function syncAndBroadcastSummary(
   context: ResponseContext,
   dbManager: DatabaseManager,
   worker: WorkerRef | undefined,
-  agentName: string
+  agentName: string,
+  discoveryTokens: number = 0,
+  inputTokens?: number | null,
+  outputTokens?: number | null
 ): Promise<void> {
   if (!summaryForStore || !result.summaryId) {
     return;
@@ -701,7 +720,10 @@ async function syncAndBroadcastSummary(
     notes: summaryForStore!.notes,
     project: context.project,
     prompt_number: context.promptNumber,
-    created_at_epoch: result.createdAtEpoch
+    created_at_epoch: result.createdAtEpoch,
+    discovery_tokens: discoveryTokens,
+    input_tokens: inputTokens ?? undefined,
+    output_tokens: outputTokens ?? undefined
   });
 
   updateCursorContextForProject(context.project).catch(error => {

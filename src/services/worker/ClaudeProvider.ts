@@ -334,6 +334,8 @@ export class ClaudeProvider {
           const responseSize = textContent.length;
 
           const tokensBeforeResponse = session.cumulativeInputTokens + session.cumulativeOutputTokens;
+          const inputBefore = session.cumulativeInputTokens;
+          const outputBefore = session.cumulativeOutputTokens;
 
           const usage = message.message.usage;
           if (usage) {
@@ -366,6 +368,16 @@ export class ClaudeProvider {
 
           const discoveryTokens = (session.cumulativeInputTokens + session.cumulativeOutputTokens) - tokensBeforeResponse;
 
+          // Per-turn input/output split (analogous to discoveryTokens delta).
+          // Only trusted when the SDK reported both sides on this message;
+          // otherwise fall back to total-only so the UI does not show a
+          // half-real split.
+          const hasTurnSplit = message.message.usage
+            && typeof (message.message.usage as any).input_tokens === 'number'
+            && typeof (message.message.usage as any).output_tokens === 'number';
+          const turnInputTokens = hasTurnSplit ? session.cumulativeInputTokens - inputBefore : null;
+          const turnOutputTokens = hasTurnSplit ? session.cumulativeOutputTokens - outputBefore : null;
+
           const originalTimestamp = session.earliestPendingTimestamp;
 
           if (responseSize > 0) {
@@ -393,7 +405,9 @@ export class ClaudeProvider {
             'SDK',
             cwdTracker.lastCwd,
             modelId,
-            activeResponseContext.current
+            activeResponseContext.current,
+            hasTurnSplit ? turnInputTokens : null,
+            hasTurnSplit ? turnOutputTokens : null
           );
         }
 

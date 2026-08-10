@@ -49,6 +49,8 @@ export interface SessionSummaryRecord {
   created_at_epoch: number;
   prompt_number?: number;
   discovery_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export interface UserPromptRecord {

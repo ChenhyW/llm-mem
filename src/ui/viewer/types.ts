@@ -16,6 +16,9 @@ export interface Observation {
   prompt_number: number | null;
   created_at: string;
   created_at_epoch: number;
+  discovery_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export interface Summary {
@@ -29,6 +32,9 @@ export interface Summary {
   completed?: string;
   next_steps?: string;
   created_at_epoch: number;
+  discovery_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
 }
 
 export interface UserPrompt {

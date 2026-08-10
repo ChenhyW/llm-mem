@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Observation } from '../types';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatTokens } from '../utils/formatters';
 
 interface ObservationCardProps {
   observation: Observation;
@@ -31,6 +31,7 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel }: Obs
   const [showFacts, setShowFacts] = useState(false);
   const [showNarrative, setShowNarrative] = useState(false);
   const date = formatDate(observation.created_at_epoch);
+  const tokens = formatTokens(observation.discovery_tokens, observation.input_tokens, observation.output_tokens);
 
   const facts = observation.facts ? JSON.parse(observation.facts) : [];
   const concepts = observation.concepts ? JSON.parse(observation.concepts) : [];
@@ -118,6 +119,19 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel }: Obs
       {/* Metadata footer - id, date, and conditionally concepts/files when facts toggle is on */}
       <div className="card-meta">
         <span className="meta-date">#{observation.id} • {date}</span>
+        {tokens && (
+          <span
+            title="LLM token 用量"
+            style={{
+              display: 'inline-flex', alignItems: 'center',
+              padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+              background: 'rgba(168,85,247,0.12)',
+              color: '#a855f7',
+            }}
+          >
+            {tokens}
+          </span>
+        )}
         {vectorizedIds !== undefined && (
           <span
             title={vectorizedIds.includes(observation.id) ? '已向量化' : '未向量化'}

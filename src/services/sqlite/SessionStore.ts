@@ -122,6 +122,7 @@ export class SessionStore {
     this.ensureSyncRevisionTextAffinity();
     this.initializeSyncHubLaunchBaseline();
     this.normalizeConceptTags();
+    this.ensureLLMTokensColumns();
   }
 
   private getIndexColumns(indexName: string): string[] {
@@ -1345,6 +1346,33 @@ export class SessionStore {
     }
 
     this.db.prepare('INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)').run(11, new Date().toISOString());
+  }
+
+  private ensureLLMTokensColumns(): void {
+    const applied = this.db.prepare('SELECT version FROM schema_versions WHERE version = ?').get(55) as SchemaVersion | undefined;
+    if (applied) return;
+
+    const observationsInfo = this.db.query('PRAGMA table_info(observations)').all() as TableColumnInfo[];
+    if (!observationsInfo.some(col => col.name === 'input_tokens')) {
+      this.db.run('ALTER TABLE observations ADD COLUMN input_tokens INTEGER DEFAULT 0');
+      logger.debug('DB', 'Added input_tokens column to observations table');
+    }
+    if (!observationsInfo.some(col => col.name === 'output_tokens')) {
+      this.db.run('ALTER TABLE observations ADD COLUMN output_tokens INTEGER DEFAULT 0');
+      logger.debug('DB', 'Added output_tokens column to observations table');
+    }
+
+    const summariesInfo = this.db.query('PRAGMA table_info(session_summaries)').all() as TableColumnInfo[];
+    if (!summariesInfo.some(col => col.name === 'input_tokens')) {
+      this.db.run('ALTER TABLE session_summaries ADD COLUMN input_tokens INTEGER DEFAULT 0');
+      logger.debug('DB', 'Added input_tokens column to session_summaries table');
+    }
+    if (!summariesInfo.some(col => col.name === 'output_tokens')) {
+      this.db.run('ALTER TABLE session_summaries ADD COLUMN output_tokens INTEGER DEFAULT 0');
+      logger.debug('DB', 'Added output_tokens column to session_summaries table');
+    }
+
+    this.db.prepare('INSERT OR IGNORE INTO schema_versions (version, applied_at) VALUES (?, ?)').run(55, new Date().toISOString());
   }
 
   private createPendingMessagesTable(): void {
@@ -2614,7 +2642,9 @@ export class SessionStore {
     },
     promptNumber?: number,
     discoveryTokens: number = 0,
-    overrideTimestampEpoch?: number
+    overrideTimestampEpoch?: number,
+    inputTokens?: number | null,
+    outputTokens?: number | null
   ): { id: number; createdAtEpoch: number } {
     const timestampEpoch = overrideTimestampEpoch ?? Date.now();
     const timestampIso = new Date(timestampEpoch).toISOString();
@@ -2622,8 +2652,8 @@ export class SessionStore {
     const stmt = this.db.prepare(`
       INSERT INTO session_summaries
       (memory_session_id, project, request, investigated, learned, completed,
-       next_steps, notes, prompt_number, discovery_tokens, created_at, created_at_epoch)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       next_steps, notes, prompt_number, discovery_tokens, input_tokens, output_tokens, created_at, created_at_epoch)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -2637,6 +2667,8 @@ export class SessionStore {
       summary.notes,
       promptNumber || null,
       discoveryTokens,
+      inputTokens ?? 0,
+      outputTokens ?? 0,
       timestampIso,
       timestampEpoch
     );
@@ -2674,7 +2706,9 @@ export class SessionStore {
     promptNumber?: number,
     discoveryTokens: number = 0,
     overrideTimestampEpoch?: number,
-    generatedByModel?: string
+    generatedByModel?: string,
+    inputTokens?: number | null,
+    outputTokens?: number | null
   ): { observationIds: number[]; summaryId: number | null; createdAtEpoch: number } {
     const timestampEpoch = overrideTimestampEpoch ?? Date.now();
     const timestampIso = new Date(timestampEpoch).toISOString();
@@ -2685,9 +2719,10 @@ export class SessionStore {
       const obsStmt = this.db.prepare(`
         INSERT INTO observations
         (memory_session_id, project, type, title, subtitle, facts, narrative, concepts,
-         files_read, files_modified, prompt_number, discovery_tokens, agent_type, agent_id, content_hash, created_at, created_at_epoch,
+         files_read, files_modified, prompt_number, discovery_tokens, input_tokens, output_tokens,
+         agent_type, agent_id, content_hash, created_at, created_at_epoch,
          generated_by_model, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(memory_session_id, content_hash) DO NOTHING
         RETURNING id
       `);
@@ -2710,6 +2745,8 @@ export class SessionStore {
           JSON.stringify(observation.files_modified),
           promptNumber || null,
           discoveryTokens,
+          inputTokens ?? 0,
+          outputTokens ?? 0,
           observation.agent_type ?? null,
           observation.agent_id ?? null,
           contentHash,
@@ -2738,8 +2775,8 @@ export class SessionStore {
         const summaryStmt = this.db.prepare(`
           INSERT INTO session_summaries
           (memory_session_id, project, request, investigated, learned, completed,
-           next_steps, notes, prompt_number, discovery_tokens, created_at, created_at_epoch)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           next_steps, notes, prompt_number, discovery_tokens, input_tokens, output_tokens, created_at, created_at_epoch)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const result = summaryStmt.run(
@@ -2753,6 +2790,8 @@ export class SessionStore {
           summary.notes,
           promptNumber || null,
           discoveryTokens,
+          inputTokens ?? 0,
+          outputTokens ?? 0,
           timestampIso,
           timestampEpoch
         );
@@ -3028,7 +3067,10 @@ export class SessionStore {
         completed: s.completed,
         next_steps: s.next_steps,
         created_at: s.created_at,
-        created_at_epoch: s.created_at_epoch
+        created_at_epoch: s.created_at_epoch,
+        discovery_tokens: s.discovery_tokens ?? 0,
+        input_tokens: s.input_tokens ?? 0,
+        output_tokens: s.output_tokens ?? 0
       })),
       prompts: prompts.map(p => ({
         id: p.id,

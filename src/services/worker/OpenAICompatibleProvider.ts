@@ -177,7 +177,8 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
       session.lastUsage = this.buildLastUsage(initResponse);
       await processAgentResponse(
         initResponse.content, session, this.dbManager, this.sessionManager,
-        worker, tokensUsed, null, this.providerName, undefined, initResponse.servedModel ?? model, responseContext
+        worker, tokensUsed, null, this.providerName, undefined, initResponse.servedModel ?? model, responseContext,
+        initResponse.inputTokens, initResponse.outputTokens
       );
     } else {
       logger.error('SDK', `Empty ${this.providerName} init response - session may lack context`, {
@@ -239,7 +240,8 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     if (obsResponse.content || this.forwardEmptyMessageResponse) {
       await processAgentResponse(
         obsResponse.content || '', session, this.dbManager, this.sessionManager,
-        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, obsResponse.servedModel ?? config.model, responseContext
+        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, obsResponse.servedModel ?? config.model, responseContext,
+        obsResponse.inputTokens, obsResponse.outputTokens
       );
     } else {
       logger.warn('SDK', `Empty ${this.providerName} observation response, leaving queue intact`, {
@@ -303,7 +305,8 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     if (summaryResponse.content || this.forwardEmptyMessageResponse) {
       await processAgentResponse(
         summaryResponse.content || '', session, this.dbManager, this.sessionManager,
-        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, summaryResponse.servedModel ?? summaryConfig.model, responseContext
+        worker, tokensUsed, originalTimestamp, this.providerName, lastCwd, summaryResponse.servedModel ?? summaryConfig.model, responseContext,
+        summaryResponse.inputTokens, summaryResponse.outputTokens
       );
     } else {
       logger.warn('SDK', `Empty ${this.providerName} summary response, leaving queue intact`, {
