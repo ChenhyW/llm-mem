@@ -28,43 +28,7 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
   const [query, setQuery] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [limit, setLimit] = useState('5');
-  const [threshold, setThreshold] = useState('0.75');
-  const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<TestResult>({ status: 'idle', context: '', count: 0 });
-
-  // Load persisted threshold on mount; debounce-save on change
-  React.useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch(API_ENDPOINTS.SETTINGS);
-        if (r.ok) {
-          const d = await r.json();
-          const v = d['LLM_MEM_SEMANTIC_INJECT_MIN_SCORE'];
-          if (v !== undefined) setThreshold(String(v));
-        }
-      } catch {}
-    })();
-  }, []);
-
-  const savedThresholdRef = React.useRef<string>(threshold);
-  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  React.useEffect(() => {
-    savedThresholdRef.current = threshold;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      const val = savedThresholdRef.current;
-      setSaving(true);
-      try {
-        await fetch(API_ENDPOINTS.SETTINGS, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ LLM_MEM_SEMANTIC_INJECT_MIN_SCORE: val }),
-        });
-      } catch {}
-      setSaving(false);
-    }, 500);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [threshold]);
 
   const handleTest = useCallback(async () => {
     if (!query.trim() || query.trim().length < 20) {
@@ -151,29 +115,6 @@ export function SemanticTestPanel({ projects }: SemanticTestPanelProps) {
               value={limit}
               onChange={e => setLimit(e.target.value)}
               className="semantic-test-input semantic-test-input--small"
-            />
-          </div>
-          <div className="semantic-test-control">
-            <label>
-              最低分数
-              {saving && (
-                <span style={{ fontSize: 11, color: 'var(--color-accent)', fontWeight: 500, marginLeft: 4 }}>
-                  保存中…
-                </span>
-              )}
-            </label>
-            <input
-              type="number"
-              min="0"
-              max="1"
-              step="0.01"
-              value={threshold}
-              onChange={e => {
-                const v = Math.min(1, Math.max(0, parseFloat(e.target.value ?? '0'))).toFixed(2);
-                setThreshold(v);
-              }}
-              className="semantic-test-input semantic-test-input--small"
-              title="语义注入的最低相似度阈值（0-1），低于此分的记忆不会被注入"
             />
           </div>
         </div>
