@@ -22,6 +22,8 @@ import { assertCanonicalDecimal, type ContentKind } from '../../../sync/Canonica
 interface RebuildStatus {
   status: 'idle' | 'running' | 'done' | 'failed';
   elements?: number;
+  rebuilt?: number;
+  skipped?: number;
   error?: string;
   startedAt?: number;
 }
@@ -568,8 +570,13 @@ export class DataRoutes extends BaseRouteHandler {
     (async () => {
       try {
         const { HnswSync } = await import('../../../sync/HnswSync.js');
-        await HnswSync.buildIndex();
-        rebuildStatus = { status: 'done', elements: undefined };
+        const result = await HnswSync.buildIndex();
+        rebuildStatus = {
+          status: 'done',
+          elements: result?.elements,
+          rebuilt: result?.rebuilt ?? 0,
+          skipped: result?.skipped ?? 0,
+        };
       } catch (error) {
         rebuildStatus = { status: 'failed', error: error instanceof Error ? error.message : String(error) };
         logger.error('HTTP', 'Manual vector rebuild failed', { error: error instanceof Error ? error.message : String(error) });
@@ -615,7 +622,16 @@ export class DataRoutes extends BaseRouteHandler {
       } catch { /* id-map missing → zeros */ }
 
       const running = rebuildStatus.status === 'running';
-      res.json({ status: running ? 'running' : 'idle', total, vectorized, failed, errors, startedAt: rebuildStatus.startedAt });
+      res.json({
+        status: running ? 'running' : 'idle',
+        total,
+        vectorized,
+        failed,
+        errors,
+        rebuilt: rebuildStatus.rebuilt ?? 0,
+        skipped: rebuildStatus.skipped ?? 0,
+        startedAt: rebuildStatus.startedAt,
+      });
     } catch (error) {
       res.json({ status: 'idle', total: 0, vectorized: 0, failed: 0, errors: [] });
     }

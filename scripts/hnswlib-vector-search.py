@@ -378,10 +378,12 @@ def cmd_build(args):
             pass
 
     # db_id -> (old_label, old_entry) for quick lookup
+    # Key on sqlite_id (stable) rather than the SQLite row `id` (changes when
+    # records are deleted), so id-map entries still match after deletions.
     old_by_db_id: dict[int, tuple[int, dict]] = {}
     for k, v in old_id_map.items():
-        if isinstance(v, dict) and "id" in v:
-            old_by_db_id[int(v["id"])] = (int(k), v)
+        if isinstance(v, dict) and "sqlite_id" in v:
+            old_by_db_id[int(v["sqlite_id"])] = (int(k), v)
 
     # ── Phase 1: incremental embed & save id-map per-row ──
     by_label: dict[int, dict] = {}
@@ -390,7 +392,7 @@ def cmd_build(args):
     skipped = 0
 
     for label, row in enumerate(rows):
-        db_id = int(row["id"])
+        db_id = int(row["sqlite_id"])
         meta: dict = {
             "id": db_id,
             "sqlite_id": int(row["sqlite_id"]),
@@ -424,7 +426,6 @@ def cmd_build(args):
                     meta["status"] = "failed"
                     meta["vector_error"] = "re-embed (vector missing on disk) returned None"
                 by_label[label] = meta
-            save_id_map(hnsw_dir, by_label)
             skipped += 1
             continue
 
@@ -438,7 +439,6 @@ def cmd_build(args):
             meta["status"] = "failed"
             meta["vector_error"] = "embed returned None or failed"
         by_label[label] = meta
-        save_id_map(hnsw_dir, by_label)
 
     # ── Phase 2: build hnsw index from vectorized entries ──
     final_vecs: list[list[float]] = []

@@ -192,7 +192,7 @@ export class HnswSync {
     logger.info('HNSW_SYNC', 'backfill check complete for all projects');
   }
 
-  static async buildIndex(): Promise<void> {
+  static async buildIndex(): Promise<{ built: boolean; elements: number; rebuilt: number; skipped: number } | void> {
     try {
       const settings: Record<string, unknown> =
         SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH) as any;
@@ -212,8 +212,9 @@ export class HnswSync {
         logger.warn('HNSW_SYNC', 'index build failed', { stderr: result.stderr });
         return;
       }
-      const out = JSON.parse(result.stdout.trim()) as { built: boolean; elements: number };
-      logger.info('HNSW_SYNC', 'index built', { built: out.built, elements: out.elements });
+      const out = JSON.parse(result.stdout.trim()) as { built: boolean; elements: number; rebuilt: number; skipped: number };
+      logger.info('HNSW_SYNC', 'index built', { built: out.built, elements: out.elements, rebuilt: out.rebuilt, skipped: out.skipped });
+      return out;
     } catch (err) {
       logger.warn('HNSW_SYNC', 'index build threw', {}, err instanceof Error ? err : new Error(String(err)));
     }
