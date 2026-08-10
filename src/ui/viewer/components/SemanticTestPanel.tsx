@@ -26,7 +26,9 @@ interface TestResult {
 }
 
 export function SemanticTestPanel({ projects, currentProject }: SemanticTestPanelProps) {
+  const initialProject = currentProject || (projects.length > 0 ? projects[0] : '');
   const [query, setQuery] = useState('');
+  const [selectedProject, setSelectedProject] = useState(initialProject);
   const [limit, setLimit] = useState('5');
   const [result, setResult] = useState<TestResult>({ status: 'idle', context: '', count: 0 });
 
@@ -39,7 +41,7 @@ export function SemanticTestPanel({ projects, currentProject }: SemanticTestPane
     const body = {
       q: query.trim(),
       limit: String(limit),
-      ...(currentProject ? { project: currentProject } : {}),
+      ...(selectedProject ? { project: selectedProject } : {}),
     };
     try {
       const resp = await fetch(API_ENDPOINTS.SEMANTIC_CONTEXT, {
@@ -62,7 +64,7 @@ export function SemanticTestPanel({ projects, currentProject }: SemanticTestPane
       const message = err instanceof Error ? err.message : '请求失败';
       setResult({ status: 'error', context: '', count: 0, message });
     }
-  }, [query, currentProject, limit]);
+  }, [query, selectedProject, limit]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -95,12 +97,17 @@ export function SemanticTestPanel({ projects, currentProject }: SemanticTestPane
 
       <div className="semantic-test-card">
         <div className="semantic-test-controls">
-          {currentProject && (
-            <div className="semantic-test-control">
-              <label>项目</label>
-              <div className="semantic-test-current-project">{currentProject}</div>
-            </div>
-          )}
+          <div className="semantic-test-control">
+            <label>项目</label>
+            <select
+              value={selectedProject}
+              onChange={e => setSelectedProject(e.target.value)}
+              className="semantic-test-select"
+            >
+              {projects.length === 0 && <option value="">无项目</option>}
+              {projects.map(p => (<option key={p} value={p}>{p}</option>))}
+            </select>
+          </div>
           <div className="semantic-test-control">
             <label>注入条数</label>
             <input
