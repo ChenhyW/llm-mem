@@ -166,16 +166,6 @@ export class SessionMessageBuffer {
     let lastActivityTime = Date.now();
 
     while (!signal.aborted) {
-      // Priority: any buffered summarize must be flushed immediately — never
-      // let an in-progress observation batch bury the once-per-session summary.
-      const pendingSummary = this._peekUnclaimedSummarize(sessionDbId);
-      if (pendingSummary) {
-        this._unclaim(pendingSummary._persistentId);
-        yield { kind: 'summarize', message: pendingSummary };
-        lastActivityTime = Date.now();
-        continue;
-      }
-
       const claimed = this.claimNext(sessionDbId);
       if (claimed) {
         lastActivityTime = Date.now();
