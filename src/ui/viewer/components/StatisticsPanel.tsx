@@ -262,13 +262,13 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
       <style>{`
         .stats-panel { padding: 18px 20px 24px; }
         .stats-header h2 {
-          margin: 0 0 6px; font-size: 18px; font-weight: 600;
+          margin: 0 0 6px; font-size: 16px; font-weight: 600;
           display: flex; align-items: center; gap: 8px;
           color: var(--color-text-title, #222);
         }
         .stats-header h2 svg { opacity: 0.7; }
         .stats-description {
-          margin: 0 0 18px; font-size: 13px; line-height: 1.6;
+          margin: 0 0 18px; font-size: 12px; line-height: 1.5;
           color: var(--color-text-secondary, #555);
         }
         .stats-controls {
