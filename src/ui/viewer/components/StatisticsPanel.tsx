@@ -97,7 +97,8 @@ const CHART_HEIGHT = 130;
 const PAD_L = 6;
 const PAD_R = 36;
 const PAD_T = 8;
-const PAD_B = 20;
+const PAD_B = 16;
+const TOOLTIP_HTML_HEIGHT = 68;
 
 function useLineChart(
   series: StatsTimeSeriesRow[],
@@ -358,6 +359,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           border-top: 1px solid var(--color-border-secondary, #eee);
           padding-top: 10px;
           position: relative;
+          margin-bottom: 40px;
         }
         .stats-chart-svg {
           width: 100%; height: auto; display: block;
@@ -365,6 +367,36 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         }
         .stats-chart-ytext, .stats-chart-xtext {
           font-size: 8px; fill: var(--color-text-muted, #999);
+        }
+        .stats-chart-tooltip-html {
+          position: absolute;
+          bottom: -78px;
+          transform: translateX(-50%);
+          min-width: 170px;
+          background: var(--color-bg-card, #fff);
+          border: 1px solid var(--color-border-primary, #ccc);
+          border-radius: 4px;
+          padding: 4px 8px;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          z-index: 10;
+          display: flex; flex-direction: column; gap: 1px;
+          pointer-events: auto;
+        }
+        .stats-chart-tooltip-html .stats-chart-tooltip-date {
+          font-size: 10px; font-weight: 600;
+          color: var(--color-text-primary, #222);
+          margin-bottom: 1px;
+        }
+        .stats-chart-tooltip-html .stats-chart-tooltip-line {
+          font-size: 10px; line-height: 15px; cursor: pointer;
+          display: flex; gap: 6px; align-items: baseline;
+        }
+        .stats-chart-tooltip-html .stats-chart-tooltip-metric { opacity: 0.75; }
+        .stats-chart-tooltip-html .stats-chart-tooltip-value { font-weight: 500; }
+        .stats-chart-tooltip-html .stats-chart-tooltip-sub {
+          font-size: 9px; color: var(--color-text-secondary, #666);
+          display: block; margin-top: 1px; padding-left: 6px;
+          white-space: nowrap;
         }
         .stats-chart-tooltip-date {
           font-size: 10px; font-weight: 600; fill: var(--color-text-primary, #222);
@@ -654,6 +686,19 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
               );
             })}
 
+            {isTodayIdx >= 0 && (
+              <line
+                x1={xForIdx(isTodayIdx)}
+                x2={xForIdx(isTodayIdx)}
+                y1={PAD_T}
+                y2={CHART_HEIGHT - PAD_B}
+                stroke="var(--color-accent-primary, #6366f1)"
+                strokeDasharray="4 2"
+                strokeWidth="1"
+                strokeOpacity="0.55"
+              />
+            )}
+
             {hoverIdx >= 0 && (
               <line
                 x1={xForIdx(hoverIdx)}
@@ -665,60 +710,6 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
                 strokeWidth="1"
               />
             )}
-
-            {isTodayIdx >= 0 && isTodayIdx !== hoverIdx && (
-              <line
-                x1={xForIdx(isTodayIdx)}
-                x2={xForIdx(isTodayIdx)}
-                y1={PAD_T}
-                y2={CHART_HEIGHT - PAD_B}
-                stroke="var(--color-accent-primary, #6366f1)"
-                strokeDasharray="4 2"
-                strokeWidth="1"
-                strokeOpacity="0.6"
-              />
-            )}
-
-            {hoverIdx >= 0 && series[hoverIdx] && (() => {
-              const hoverX = xForIdx(hoverIdx);
-              const rectW = 192;
-              const rectH = 18 + selectedMetrics.size * 14 + (activeMetricTooltip ? 16 : 0);
-              const rawX = hoverX - rectW / 2;
-              const clampedX = Math.max(0, Math.min(CHART_WIDTH - rectW, rawX));
-              const clampedCx = clampedX + rectW / 2;
-              return (
-                <g className="stats-chart-tooltip"
-                  transform={`translate(${clampedCx}, ${CHART_HEIGHT - PAD_B + 24})`}>
-                  <rect
-                    x={-rectW / 2} y={0}
-                    width={rectW} height={rectH}
-                    fill="var(--color-bg-card, #fff)"
-                    stroke="var(--color-border-primary, #ccc)"
-                    rx={4}
-                  />
-                  <text x={-rectW / 2 + 6} y={12} className="stats-chart-tooltip-date">
-                    {series[hoverIdx].date}
-                  </text>
-                  {[...selectedMetrics].map((m, i) => {
-                    const row = series[hoverIdx];
-                    const mMeta = METRICS.find(x => x.key === m)!;
-                    const showDetail = activeMetricTooltip === m;
-                    return (
-                      <g key={m} onClick={() => handleMetricClick(m)}>
-                        <text x={-rectW / 2 + 6} y={28 + i * 14} className="stats-chart-tooltip-line" fill={mMeta.color}>
-                          {mMeta.label}: {fmt(row[m] as number)} {mMeta.unit}
-                        </text>
-                        {showDetail && (
-                          <text x={-rectW / 2 + 6} y={28 + i * 14 + 14} className="stats-chart-tooltip-sub">
-                            观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </g>
-              );
-            })()}
 
             <g className="stats-chart-xlabels">
               {series.map((row, i) => {
@@ -741,6 +732,37 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
               })}
             </g>
           </svg>
+
+          {hoverIdx >= 0 && series[hoverIdx] && (() => {
+            const hoverX = xForIdx(hoverIdx);
+            const leftPct = (hoverX / CHART_WIDTH) * 100;
+            return (
+              <div className="stats-chart-tooltip-html"
+                style={{ left: `${leftPct}%` }}
+              >
+                <div className="stats-chart-tooltip-date">{series[hoverIdx].date}</div>
+                {[...selectedMetrics].map((m, i) => {
+                  const row = series[hoverIdx];
+                  const mMeta = METRICS.find(x => x.key === m)!;
+                  const showDetail = activeMetricTooltip === m;
+                  return (
+                    <span key={m} className="stats-chart-tooltip-line"
+                      style={{ color: mMeta.color }}
+                      onClick={() => handleMetricClick(m)}
+                    >
+                      <span className="stats-chart-tooltip-metric">{mMeta.label}</span>
+                      <span className="stats-chart-tooltip-value">{fmt(row[m] as number)} {mMeta.unit}</span>
+                      {showDetail && (
+                        <span className="stats-chart-tooltip-sub">
+                          观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {series.length > 0 && (
             <div className="stats-chart-legend">
