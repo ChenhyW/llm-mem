@@ -92,12 +92,12 @@ function useStats(periodDays: number, project: string) {
   return { overview, series, sessions, sessionsOffset, sessionsHasMore, loading, error, loadMoreSessions };
 }
 
-const CHART_WIDTH = 720;
-const CHART_HEIGHT = 180;
-const PAD_L = 8;
-const PAD_R = 12;
-const PAD_T = 12;
-const PAD_B = 22;
+const CHART_WIDTH = 640;
+const CHART_HEIGHT = 110;
+const PAD_L = 6;
+const PAD_R = 36;
+const PAD_T = 8;
+const PAD_B = 20;
 
 function useLineChart(
   series: StatsTimeSeriesRow[],
@@ -356,7 +356,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         }
         .stats-chart {
           border-top: 1px solid var(--color-border-secondary, #eee);
-          padding-top: 12px;
+          padding-top: 10px;
           position: relative;
         }
         .stats-chart-svg {
@@ -364,13 +364,13 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           font-family: ui-monospace, SF Mono, Menlo, monospace;
         }
         .stats-chart-ytext, .stats-chart-xtext {
-          font-size: 9px; fill: var(--color-text-muted, #999);
+          font-size: 8px; fill: var(--color-text-muted, #999);
         }
         .stats-chart-tooltip-date {
-          font-size: 11px; font-weight: 600; fill: var(--color-text-primary, #222);
+          font-size: 10px; font-weight: 600; fill: var(--color-text-primary, #222);
         }
         .stats-chart-tooltip-line {
-          font-size: 11px; cursor: pointer;
+          font-size: 10px; cursor: pointer;
         }
         .stats-chart-tooltip-line:hover { font-weight: 600; }
         .stats-chart-tooltip-sub {
@@ -379,19 +379,19 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         .stats-chart-legend {
           display: flex; justify-content: space-between;
           font-size: 11px; color: var(--color-text-muted, #999);
-          padding: 4px 4px 0;
+          padding: 2px 2px 0;
         }
         .stats-metric-checks {
-          display: flex; flex-wrap: wrap; gap: 6px;
-          margin: 10px 0 12px;
+          display: flex; flex-wrap: wrap; gap: 4px;
+          margin: 6px 0 8px;
         }
         .stats-metric-check {
-          display: inline-flex; align-items: center; gap: 6px;
-          padding: 5px 10px; border-radius: 6px;
+          display: inline-flex; align-items: center; gap: 5px;
+          padding: 4px 8px; border-radius: 5px;
           border: 1px solid var(--color-border-secondary, #ccc);
           background: transparent;
           color: var(--color-text-secondary, #555);
-          cursor: pointer; font-size: 12px;
+          cursor: pointer; font-size: 11px;
           transition: all 0.15s;
           user-select: none;
         }
@@ -607,21 +607,33 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
 
             {METRICS.filter(m => selectedMetrics.has(m.key)).map(m => {
               const active = activeSeriesFor(m.key);
+              const pts = series.map((row, i) => {
+                const x = xForIdx(i);
+                const y = PAD_T + (maxVal > 0
+                  ? (CHART_HEIGHT - PAD_T - PAD_B) * (1 - (row[m.key] as number) / maxVal)
+                  : (CHART_HEIGHT - PAD_T - PAD_B) / 2);
+                return [x, y];
+              });
+              const areaD = pts.length > 1
+                ? linePathByMetric[m.key] + ` L${pts[pts.length-1][0].toFixed(1)},${(CHART_HEIGHT-PAD_B).toFixed(1)} L${pts[0][0].toFixed(1)},${(CHART_HEIGHT-PAD_B).toFixed(1)} Z`
+                : '';
               return (
                 <g key={m.key}>
+                  {areaD && (
+                    <path d={areaD} fill={m.color} opacity={active >= 0 ? 0.18 : 0.07} />
+                  )}
                   <path
                     d={linePathByMetric[m.key]}
                     fill="none"
                     stroke={m.color}
-                    strokeWidth={active >= 0 ? 2.5 : 1.6}
-                    strokeOpacity={active >= 0 ? 1 : 0.85}
+                    strokeWidth={active >= 0 ? 2 : 1.4}
+                    strokeOpacity={active >= 0 ? 1 : 0.9}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                     className="stats-chart-line"
                   />
                   {series.map((row, i) => {
-                    const x = xForIdx(i);
-                    const y = PAD_T + (maxVal > 0
-                      ? (CHART_HEIGHT - PAD_T - PAD_B) * (1 - row[m.key] as number / maxVal)
-                      : (CHART_HEIGHT - PAD_T - PAD_B) / 2);
+                    const [x, y] = pts[i] as [number, number];
                     const isActive = active === i;
                     const isToday = row.date === new Date().toISOString().slice(0, 10);
                     return (
@@ -629,10 +641,10 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
                         key={i}
                         cx={x}
                         cy={y}
-                        r={isActive ? 4 : 2}
+                        r={isActive ? 3.5 : 1.8}
                         fill={isActive ? m.color : 'var(--color-bg-card, #fff)'}
                         stroke={m.color}
-                        strokeWidth={isActive ? 0 : 1.5}
+                        strokeWidth={isActive ? 0 : 1.2}
                         style={isToday && !isActive ? { strokeDasharray: '2 2' } : {}}
                         onClick={() => handleMetricClick(m.key)}
                       />
