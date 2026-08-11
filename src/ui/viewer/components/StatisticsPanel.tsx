@@ -228,7 +228,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
       { label: '总 Token', value: fmt(overview.total_tokens), sub: `输入 ${fmt(overview.input_tokens)} · 输出 ${fmt(overview.output_tokens)}`, color: '#6366f1', icon: <TextIcon /> },
       { label: 'LLM 调用', value: fmt(overview.llm_calls), sub: `批 ${overview.batch_count} + 摘要 ${overview.summary_count}`, color: '#f59e0b', icon: <BotIcon /> },
       { label: 'Session 数', value: fmt(overview.session_count), sub: `摘要 ${overview.summary_count} · 观察 ${overview.observation_count}`, color: '#06b6d4', icon: <SessionIcon /> },
-      { label: '平均每次调用', value: fmt(overview.avg_output_tokens_per_call), sub: `输出 tok · 输入 ${fmt(overview.avg_input_tokens_per_call)}`, color: '#22c55e', icon: <AvgIcon /> },
+      { label: '平均每次调用', value: fmt(overview.avg_output_tokens_per_call), sub: `输出 ${fmt(overview.avg_output_tokens_per_call)} · 输入 ${fmt(overview.avg_input_tokens_per_call)}`, color: '#22c55e', icon: <AvgIcon /> },
     ];
   }, [overview]);
 
