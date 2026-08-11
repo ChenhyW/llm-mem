@@ -359,7 +359,12 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           border-top: 1px solid var(--color-border-secondary, #eee);
           padding-top: 10px;
           position: relative;
-          margin-bottom: 70px;
+          margin-top: 70px;
+          margin-bottom: 0;
+        }
+        .stats-chart-anchor {
+          position: relative;
+          width: 100%;
         }
         .stats-chart-svg {
           width: 100%; height: auto; display: block;
@@ -370,13 +375,15 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         }
         .stats-chart-tooltip-html {
           position: absolute;
-          bottom: -110px;
+          bottom: 100%;
+          left: 0;
+          margin-bottom: 4px;
           min-width: 240px;
           background: var(--color-bg-card, #fff);
           border: 1px solid var(--color-border-primary, #ccc);
           border-radius: 6px;
           padding: 8px 12px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
           z-index: 10;
           display: flex; flex-direction: column; gap: 4px;
           pointer-events: auto;
@@ -597,7 +604,42 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           ))}
         </div>
 
-        <div className="stats-chart">
+        <div className="stats-chart-anchor">
+          {hoverIdx >= 0 && series[hoverIdx] && (() => {
+            const hoverX = xForIdx(hoverIdx);
+            const leftPct = (hoverX / CHART_WIDTH) * 100;
+            const tooltipHalfW = 120 / CHART_WIDTH * 100;
+            let edgeClass: 'left-edge' | 'right-edge' | '' = '';
+            let finalLeftPct = leftPct;
+            if (leftPct < tooltipHalfW) { edgeClass = 'left-edge'; finalLeftPct = 0; }
+            else if (leftPct > 100 - tooltipHalfW) { edgeClass = 'right-edge'; finalLeftPct = 100; }
+            return (
+              <div className={`stats-chart-tooltip-html ${edgeClass}`}
+                style={{ left: `${finalLeftPct}%` }}
+              >
+                <div className="stats-chart-tooltip-date">{series[hoverIdx].date}</div>
+                {[...selectedMetrics].map((m, i) => {
+                  const row = series[hoverIdx];
+                  const mMeta = METRICS.find(x => x.key === m)!;
+                  const showDetail = activeMetricTooltip === m;
+                  return (
+                    <span key={m} className="stats-chart-tooltip-line"
+                      style={{ color: mMeta.color }}
+                      onClick={() => handleMetricClick(m)}
+                    >
+                      <span className="stats-chart-tooltip-metric">{mMeta.label}</span>
+                      <span className="stats-chart-tooltip-value">{fmt(row[m] as number)} {mMeta.unit}</span>
+                      {showDetail && (
+                        <span className="stats-chart-tooltip-sub">
+                          观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
+                        </span>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            );
+          })()}
           <svg
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             preserveAspectRatio="none"
@@ -740,44 +782,6 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
               })}
             </g>
           </svg>
-
-          {hoverIdx >= 0 && series[hoverIdx] && (() => {
-            const hoverX = xForIdx(hoverIdx);
-            const leftPct = (hoverX / CHART_WIDTH) * 100;
-            // Tooltip min-width ~240px, half ~120px. Clamp to edges so it never
-            // gets clipped at the left or right of the chart.
-            const tooltipHalfW = 120 / CHART_WIDTH * 100;
-            let edgeClass: 'left-edge' | 'right-edge' | '' = '';
-            let finalLeftPct = leftPct;
-            if (leftPct < tooltipHalfW) { edgeClass = 'left-edge'; finalLeftPct = 0; }
-            else if (leftPct > 100 - tooltipHalfW) { edgeClass = 'right-edge'; finalLeftPct = 100; }
-            return (
-              <div className={`stats-chart-tooltip-html ${edgeClass}`}
-                style={{ left: `${finalLeftPct}%` }}
-              >
-                <div className="stats-chart-tooltip-date">{series[hoverIdx].date}</div>
-                {[...selectedMetrics].map((m, i) => {
-                  const row = series[hoverIdx];
-                  const mMeta = METRICS.find(x => x.key === m)!;
-                  const showDetail = activeMetricTooltip === m;
-                  return (
-                    <span key={m} className="stats-chart-tooltip-line"
-                      style={{ color: mMeta.color }}
-                      onClick={() => handleMetricClick(m)}
-                    >
-                      <span className="stats-chart-tooltip-metric">{mMeta.label}</span>
-                      <span className="stats-chart-tooltip-value">{fmt(row[m] as number)} {mMeta.unit}</span>
-                      {showDetail && (
-                        <span className="stats-chart-tooltip-sub">
-                          观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-            );
-          })()}
 
           {series.length > 0 && (
             <div className="stats-chart-legend">
