@@ -428,6 +428,13 @@ export class SearchRoutes extends BaseRouteHandler {
     });
 
     const injected = results.filter((r: any) => r.injected);
+    if (injected.length === 0) {
+      // No observations above the threshold — avoid injecting an empty header
+      // shell (would otherwise consume tokens for no information).
+      res.json({ context: '', count: 0, total: results.length, threshold: minScore, results });
+      return;
+    }
+
     const lines: string[] = ['## Relevant Past Work (semantic match)\n'];
     for (const r of injected.slice(0, limit)) {
       lines.push(`### ${r.title} (${r.date})`);
