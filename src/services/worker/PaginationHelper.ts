@@ -184,6 +184,7 @@ export class PaginationHelper {
         COALESCE(s.platform_source, 'claude') as platform_source,
         up.prompt_number,
         up.prompt_text,
+        up.semantic_context,
         up.created_at,
         up.created_at_epoch
       FROM user_prompts up

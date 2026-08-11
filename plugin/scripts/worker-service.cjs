@@ -2448,6 +2448,7 @@ ${i.content}`:r.push({role:s,parts:[{text:i.content}]})}return r.length===0?[{ro
         COALESCE(s.platform_source, 'claude') as platform_source,
         up.prompt_number,
         up.prompt_text,
+        up.semantic_context,
         up.created_at,
         up.created_at_epoch
       FROM user_prompts up
