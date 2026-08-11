@@ -484,30 +484,40 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         .stats-sessions-table {
           width: 100%; border-collapse: collapse;
           font-size: 13px;
+          table-layout: fixed;
         }
         .stats-sessions-table th, .stats-sessions-table td {
-          padding: 7px 10px; text-align: right;
+          padding: 7px 8px; text-align: right;
           border-bottom: 1px solid var(--color-border-secondary, #eee);
           white-space: nowrap;
         }
         .stats-sessions-table th:first-child,
         .stats-sessions-table td:first-child { text-align: left; }
+        /* col 2 = session id — keep full width, nowrap */
+        .stats-sessions-table col.c-date   { width: 130px; }
+        .stats-sessions-table col.c-session { width: 380px; }
+        .stats-sessions-table col.c-proj  { width: 150px; }
+        .stats-sessions-table col.c-num   { width: 70px; }
+        .stats-sessions-table col.c-total { width: 80px; }
+        .stats-sessions-table td.session-id {
+          text-align: left;
+          font-family: ui-monospace, SF Mono, Menlo, monospace;
+          font-size: 11px; color: var(--color-text-muted, #888);
+          white-space: nowrap; overflow: visible; text-overflow: clip;
+          max-width: none;
+        }
+        .stats-sessions-table th.session-head {
+          text-align: left;
+        }
         .stats-sessions-table th {
           color: var(--color-text-secondary, #555); font-weight: 600;
           font-size: 12px; background: var(--color-bg-secondary, #fafafa);
           position: sticky; top: 0;
         }
-        .stats-sessions-table td:first-child {
-          color: var(--color-text-muted, #777); font-size: 12px;
-        }
-        .stats-sessions-table td:nth-child(2) {
+        .stats-sessions-table td:nth-child(3) {
           max-width: 200px; overflow: hidden; text-overflow: ellipsis;
           white-space: nowrap; font-size: 12px;
           color: var(--color-text-secondary, #555);
-        }
-        .stats-session-id {
-          font-family: ui-monospace, SF Mono, Menlo, monospace;
-          font-size: 11px; color: var(--color-text-muted, #888);
         }
         .stats-load-more {
           display: block; margin: 12px auto 0;
@@ -819,9 +829,22 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           <>
             <div style={{ overflowX: 'auto' }}>
               <table className="stats-sessions-table">
+                <colgroup>
+                  <col className="c-date" />
+                  <col className="c-session" />
+                  <col className="c-proj" />
+                  <col className="c-num" />
+                  <col className="c-num" />
+                  <col className="c-total" />
+                  <col className="c-num" />
+                  <col className="c-num" />
+                  <col className="c-num" />
+                  <col className="c-num" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>日期</th>
+                    <th className="session-head">Session</th>
                     <th>项目</th>
                     <th>输入</th>
                     <th>输出</th>
@@ -830,13 +853,15 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
                     <th>批</th>
                     <th>观察</th>
                     <th>摘要</th>
-                    <th>Session</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sessionsSorted.map((r, i) => (
                     <tr key={i}>
                       <td>{r.date}</td>
+                      <td className="session-id" title={r.session_id}>
+                        {r.session_id}
+                      </td>
                       <td title={r.project}>{r.project}</td>
                       <td>{fmt(r.input_tokens)}</td>
                       <td>{fmt(r.output_tokens)}</td>
@@ -845,9 +870,6 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
                       <td>{r.batches}</td>
                       <td>{r.observations}</td>
                       <td>{r.summaries}</td>
-                      <td className="stats-session-id" title={r.session_id}>
-                        {r.session_id.slice(0, 8)}…
-                      </td>
                     </tr>
                   ))}
                 </tbody>
