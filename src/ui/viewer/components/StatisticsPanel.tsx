@@ -722,14 +722,17 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
 
             <g className="stats-chart-xlabels">
               {series.map((row, i) => {
-                const show = (i % Math.ceil(series.length / 8)) === 0 || i === series.length - 1 || i === isTodayIdx;
+                const isFirst = i === 0;
+                const isLast = i === series.length - 1;
+                const show = isFirst || isLast || i === isTodayIdx || (i % Math.ceil(series.length / 8)) === 0;
                 if (!show) return null;
+                const anchor = isFirst ? 'start' : isLast ? 'end' : 'middle';
                 return (
                   <text
                     key={i}
                     x={xForIdx(i)}
-                    y={CHART_HEIGHT - PAD_B + 14}
-                    textAnchor="middle"
+                    y={CHART_HEIGHT - PAD_B + 12}
+                    textAnchor={anchor}
                     className="stats-chart-xtext"
                   >
                     {row.date.slice(5)}
