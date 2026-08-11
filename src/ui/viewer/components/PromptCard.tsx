@@ -12,6 +12,14 @@ export function PromptCard({ prompt }: PromptCardProps) {
 
   const semanticContext = prompt.semantic_context?.trim() || '';
   const hasSemanticContext = semanticContext.length > 0;
+  // Observation sections are written as level-3 headings ("### ...") and the
+  // top-level "## Relevant Past Work" wrapper is level-2. Count level-3
+  // headings (or, defensively, any level-2/level-3 heading minus the wrapper).
+  const headingMatches = semanticContext.match(/^#{2,3} /gm) || [];
+  const sectionCount = Math.max(
+    0,
+    headingMatches.length - (semanticContext.includes('Relevant Past Work') ? 1 : 0)
+  );
 
   if (hasSemanticContext && !showInjection) {
     // Parse the count of observation sections (each starts with ### )
