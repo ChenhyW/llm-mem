@@ -359,7 +359,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           border-top: 1px solid var(--color-border-secondary, #eee);
           padding-top: 10px;
           position: relative;
-          margin-bottom: 40px;
+          margin-bottom: 70px;
         }
         .stats-chart-svg {
           width: 100%; height: auto; display: block;
@@ -370,32 +370,40 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         }
         .stats-chart-tooltip-html {
           position: absolute;
-          bottom: -78px;
-          transform: translateX(-50%);
-          min-width: 170px;
+          bottom: -110px;
+          min-width: 240px;
           background: var(--color-bg-card, #fff);
           border: 1px solid var(--color-border-primary, #ccc);
-          border-radius: 4px;
-          padding: 4px 8px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+          border-radius: 6px;
+          padding: 8px 12px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
           z-index: 10;
-          display: flex; flex-direction: column; gap: 1px;
+          display: flex; flex-direction: column; gap: 4px;
           pointer-events: auto;
         }
+        .stats-chart-tooltip-html.left-edge {
+          left: 0 !important; transform: none !important;
+        }
+        .stats-chart-tooltip-html.right-edge {
+          right: 0 !important; left: auto !important; transform: none !important;
+        }
         .stats-chart-tooltip-html .stats-chart-tooltip-date {
-          font-size: 10px; font-weight: 600;
+          font-size: 12px; font-weight: 600;
           color: var(--color-text-primary, #222);
-          margin-bottom: 1px;
+          margin-bottom: 2px;
+          padding-bottom: 4px;
+          border-bottom: 1px solid var(--color-border-secondary, #eee);
         }
         .stats-chart-tooltip-html .stats-chart-tooltip-line {
-          font-size: 10px; line-height: 15px; cursor: pointer;
-          display: flex; gap: 6px; align-items: baseline;
+          font-size: 12px; line-height: 18px; cursor: pointer;
+          display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
         }
-        .stats-chart-tooltip-html .stats-chart-tooltip-metric { opacity: 0.75; }
-        .stats-chart-tooltip-html .stats-chart-tooltip-value { font-weight: 500; }
+        .stats-chart-tooltip-html .stats-chart-tooltip-line:hover { font-weight: 500; }
+        .stats-chart-tooltip-html .stats-chart-tooltip-metric { opacity: 0.85; flex: 0 0 auto; }
+        .stats-chart-tooltip-html .stats-chart-tooltip-value { font-weight: 500; font-variant-numeric: tabular-nums; }
         .stats-chart-tooltip-html .stats-chart-tooltip-sub {
-          font-size: 9px; color: var(--color-text-secondary, #666);
-          display: block; margin-top: 1px; padding-left: 6px;
+          font-size: 11px; color: var(--color-text-secondary, #666);
+          display: block; margin-top: 2px; padding-left: 6px;
           white-space: nowrap;
         }
         .stats-chart-tooltip-date {
@@ -736,9 +744,16 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
           {hoverIdx >= 0 && series[hoverIdx] && (() => {
             const hoverX = xForIdx(hoverIdx);
             const leftPct = (hoverX / CHART_WIDTH) * 100;
+            // Tooltip min-width ~240px, half ~120px. Clamp to edges so it never
+            // gets clipped at the left or right of the chart.
+            const tooltipHalfW = 120 / CHART_WIDTH * 100;
+            let edgeClass: 'left-edge' | 'right-edge' | '' = '';
+            let finalLeftPct = leftPct;
+            if (leftPct < tooltipHalfW) { edgeClass = 'left-edge'; finalLeftPct = 0; }
+            else if (leftPct > 100 - tooltipHalfW) { edgeClass = 'right-edge'; finalLeftPct = 100; }
             return (
-              <div className="stats-chart-tooltip-html"
-                style={{ left: `${leftPct}%` }}
+              <div className={`stats-chart-tooltip-html ${edgeClass}`}
+                style={{ left: `${finalLeftPct}%` }}
               >
                 <div className="stats-chart-tooltip-date">{series[hoverIdx].date}</div>
                 {[...selectedMetrics].map((m, i) => {
