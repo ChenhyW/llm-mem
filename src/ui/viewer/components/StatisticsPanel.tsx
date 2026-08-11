@@ -111,11 +111,18 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
     overview, series, sessions, sessionsHasMore, loading, error, loadMoreSessions
   } = useStats(periodDays, selectedProject);
 
-  // Sync selectedProject into the hook when `currentProject` changes from outside (e.g. header filter).
+  // Sync selectedProject into the hook when `currentProject` changes from
+  // outside (e.g. header filter). Intentionally kept out of the dependency
+  // array so a user's dropdown change in THIS panel doesn't get overwritten
+  // back to the header's (unrelated) project filter.
+  const lastSyncedProjectRef = React.useRef('');
   useEffect(() => {
     const p = currentProject || (projects.length > 0 ? projects[0] : '');
-    if (p !== selectedProject) setSelectedProject(p);
-  }, [currentProject, projects, selectedProject]);
+    if (lastSyncedProjectRef.current === p) return;
+    lastSyncedProjectRef.current = p;
+    setSelectedProject(p);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject, projects]);
 
   const metricMeta = METRICS.find(m => m.key === metric) || METRICS[0];
   const maxVal = useMemo(() => Math.max(0, ...series.map(r => r[metric] as number)), [series, metric]);
