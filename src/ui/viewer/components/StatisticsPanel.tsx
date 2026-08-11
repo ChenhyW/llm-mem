@@ -95,8 +95,12 @@ function useStats(periodDays: number, project: string) {
 }
 
 export function StatisticsPanel({ projects, currentProject }: StatisticsPanelProps) {
-  const initialProject = currentProject || (projects.length > 0 ? projects[0] : '');
-  const [selectedProject, setSelectedProject] = useState(initialProject);
+  // Panel-own project state. Initialized from header's filter when opening
+  // the tab, but after that fully owned by the user's dropdown here so it
+  // doesn't get clobbered by header-filter changes in the observations feed.
+  const [selectedProject, setSelectedProject] = useState(
+    currentProject || (projects.length > 0 ? projects[0] : '')
+  );
   const [periodDays, setPeriodDays] = useState(90);
   const [metric, setMetric] = useState<TrendMetric>('total_tokens');
   const [sessionSort, setSessionSort] = useState<SessionSort>('tokens');
@@ -108,21 +112,8 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
   }, [projects, selectedProject]);
 
   const {
-    overview, series, sessions, sessionsHasMore, loading, error, loadMoreSessions
+    overview, series, sessions, sessionsOffset, sessionsHasMore, loading, error, loadMoreSessions
   } = useStats(periodDays, selectedProject);
-
-  // Sync selectedProject into the hook when `currentProject` changes from
-  // outside (e.g. header filter). Intentionally kept out of the dependency
-  // array so a user's dropdown change in THIS panel doesn't get overwritten
-  // back to the header's (unrelated) project filter.
-  const lastSyncedProjectRef = React.useRef('');
-  useEffect(() => {
-    const p = currentProject || (projects.length > 0 ? projects[0] : '');
-    if (lastSyncedProjectRef.current === p) return;
-    lastSyncedProjectRef.current = p;
-    setSelectedProject(p);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProject, projects]);
 
   const metricMeta = METRICS.find(m => m.key === metric) || METRICS[0];
   const maxVal = useMemo(() => Math.max(0, ...series.map(r => r[metric] as number)), [series, metric]);
