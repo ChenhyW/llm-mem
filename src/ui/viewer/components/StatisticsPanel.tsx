@@ -93,7 +93,7 @@ function useStats(periodDays: number, project: string) {
 }
 
 const CHART_WIDTH = 640;
-const CHART_HEIGHT = 110;
+const CHART_HEIGHT = 130;
 const PAD_L = 6;
 const PAD_R = 36;
 const PAD_T = 8;
@@ -626,8 +626,8 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
                     d={linePathByMetric[m.key]}
                     fill="none"
                     stroke={m.color}
-                    strokeWidth={active >= 0 ? 2 : 1.4}
-                    strokeOpacity={active >= 0 ? 1 : 0.9}
+                    strokeWidth={active >= 0 ? 1.5 : 1}
+                    strokeOpacity={active >= 0 ? 1 : 0.92}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     className="stats-chart-line"
@@ -679,38 +679,46 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
               />
             )}
 
-            {hoverIdx >= 0 && series[hoverIdx] && (
-              <g className="stats-chart-tooltip"
-                transform={`translate(${xForIdx(hoverIdx)}, ${PAD_T - 2})`}>
-                <rect
-                  x={-96} y={-10}
-                  width={192} height={18 + selectedMetrics.size * 14 + (activeMetricTooltip ? 16 : 0)}
-                  fill="var(--color-bg-card, #fff)"
-                  stroke="var(--color-border-primary, #ccc)"
-                  rx={4}
-                />
-                <text x={-90} y={2} className="stats-chart-tooltip-date">
-                  {series[hoverIdx].date}
-                </text>
-                {[...selectedMetrics].map((m, i) => {
-                  const row = series[hoverIdx];
-                  const mMeta = METRICS.find(x => x.key === m)!;
-                  const showDetail = activeMetricTooltip === m;
-                  return (
-                    <g key={m} onClick={() => handleMetricClick(m)}>
-                      <text x={-90} y={18 + i * 14} className="stats-chart-tooltip-line" fill={mMeta.color}>
-                        {mMeta.label}: {fmt(row[m] as number)} {mMeta.unit}
-                      </text>
-                      {showDetail && (
-                        <text x={-90} y={18 + i * 14 + 14} className="stats-chart-tooltip-sub">
-                          观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
+            {hoverIdx >= 0 && series[hoverIdx] && (() => {
+              const hoverX = xForIdx(hoverIdx);
+              const rectW = 192;
+              const rectH = 18 + selectedMetrics.size * 14 + (activeMetricTooltip ? 16 : 0);
+              const rawX = hoverX - rectW / 2;
+              const clampedX = Math.max(0, Math.min(CHART_WIDTH - rectW, rawX));
+              const clampedCx = clampedX + rectW / 2;
+              return (
+                <g className="stats-chart-tooltip"
+                  transform={`translate(${clampedCx}, ${CHART_HEIGHT - PAD_B + 24})`}>
+                  <rect
+                    x={-rectW / 2} y={0}
+                    width={rectW} height={rectH}
+                    fill="var(--color-bg-card, #fff)"
+                    stroke="var(--color-border-primary, #ccc)"
+                    rx={4}
+                  />
+                  <text x={-rectW / 2 + 6} y={12} className="stats-chart-tooltip-date">
+                    {series[hoverIdx].date}
+                  </text>
+                  {[...selectedMetrics].map((m, i) => {
+                    const row = series[hoverIdx];
+                    const mMeta = METRICS.find(x => x.key === m)!;
+                    const showDetail = activeMetricTooltip === m;
+                    return (
+                      <g key={m} onClick={() => handleMetricClick(m)}>
+                        <text x={-rectW / 2 + 6} y={28 + i * 14} className="stats-chart-tooltip-line" fill={mMeta.color}>
+                          {mMeta.label}: {fmt(row[m] as number)} {mMeta.unit}
                         </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
-            )}
+                        {showDetail && (
+                          <text x={-rectW / 2 + 6} y={28 + i * 14 + 14} className="stats-chart-tooltip-sub">
+                            观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            })()}
 
             <g className="stats-chart-xlabels">
               {series.map((row, i) => {
