@@ -260,7 +260,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
   return (
     <div className="stats-panel">
       <style>{`
-        .stats-panel { padding: 0 20px 24px; }
+        .stats-panel { padding: 18px 20px 24px; }
         .stats-header h2 {
           margin: 0 0 6px; font-size: 18px; font-weight: 600;
           display: flex; align-items: center; gap: 8px;
