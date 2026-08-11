@@ -113,7 +113,7 @@ export function configureCursorMcp(target: CursorInstallTarget): number {
 }
 
 export async function installCursorHooks(target: CursorInstallTarget): Promise<number> {
-  console.log(`\nInstalling Claude-Mem Cursor hooks (${target} level)...\n`);
+  console.log(`\nInstalling llm-mem Cursor hooks (${target} level)...\n`);
 
   const targetDir = getTargetDir(target);
   if (!targetDir) {
@@ -236,7 +236,7 @@ async function setupProjectContext(targetDir: string, workspaceRoot: string): Pr
     const rulesFile = path.join(rulesDir, 'llm-mem-context.mdc');
     const placeholderContent = `---
 alwaysApply: true
-description: "Claude-mem context from past sessions (auto-updated)"
+description: "llm-mem context from past sessions (auto-updated)"
 ---
 
 # Memory Context from Past Sessions
@@ -275,7 +275,7 @@ async function fetchInitialContextFromWorker(
 }
 
 export function uninstallCursorHooks(target: CursorInstallTarget): number {
-  console.log(`\nUninstalling Claude-Mem Cursor hooks (${target} level)...\n`);
+  console.log(`\nUninstalling llm-mem Cursor hooks (${target} level)...\n`);
 
   const targetDir = getTargetDir(target);
   if (!targetDir) {
@@ -340,7 +340,7 @@ function removeCursorHooksFiles(
 }
 
 export function checkCursorHooksStatus(): number {
-  console.log('\nClaude-Mem Cursor Hooks Status\n');
+  console.log('\nllm-mem Cursor Hooks Status\n');
 
   const locations: Array<{ name: string; dir: string }> = [
     { name: 'Project', dir: path.join(process.cwd(), '.cursor') },
@@ -447,7 +447,7 @@ export async function handleCursorCommand(subcommand: string, args: string[]): P
 
     default: {
       console.log(`
-Claude-Mem Cursor Integration
+llm-mem Cursor Integration
 
 Usage: llm-mem cursor <command> [options]
 

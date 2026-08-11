@@ -98,7 +98,7 @@ function removeFromInstalledPlugins(): void {
   }
 }
 
-function stripLegacyClaudeMemAlias(): void {
+function stripLegacyLlmMemAlias(): void {
   const home = homedir();
   const candidateFiles = [
     join(home, '.bashrc'),
@@ -169,7 +169,7 @@ export function removeFromClaudeSettings(): void {
   }
 }
 
-function removeStrayClaudeMemPaths(): number {
+function removeStrayLlmMemPaths(): number {
   const home = homedir();
   let removedCount = 0;
 
@@ -340,14 +340,14 @@ export async function runUninstallCommand(): Promise<void> {
     {
       title: 'Removing legacy llm-mem shell alias',
       task: async () => {
-        stripLegacyClaudeMemAlias();
+        stripLegacyLlmMemAlias();
         return `Legacy alias check complete ${styleText('green', 'OK')}`;
       },
     },
     {
       title: 'Removing stray llm-mem caches and logs',
       task: async () => {
-        const removed = removeStrayClaudeMemPaths();
+        const removed = removeStrayLlmMemPaths();
         return removed > 0
           ? `Stray paths removed: ${removed} ${styleText('green', 'OK')}`
           : `No stray paths found ${styleText('dim', 'skipped')}`;

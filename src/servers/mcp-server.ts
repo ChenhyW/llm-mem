@@ -1019,7 +1019,7 @@ async function main() {
   const transport = new StdioServerTransport();
   attachStdioLifecycle();
   await server.connect(transport);
-  logger.info('SYSTEM', 'Claude-mem search server started');
+  logger.info('SYSTEM', 'llm-mem search server started');
 
   checkMarketplaceMarker();
 

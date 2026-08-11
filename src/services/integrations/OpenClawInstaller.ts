@@ -21,7 +21,7 @@ export function getOpenClawExtensionsDirectory(): string {
   return path.join(getOpenClawConfigDirectory(), 'extensions');
 }
 
-export function getOpenClawClaudeMemExtensionDirectory(): string {
+export function getOpenClawLlmMemExtensionDirectory(): string {
   return path.join(getOpenClawExtensionsDirectory(), 'llm-mem');
 }
 
@@ -151,7 +151,7 @@ export function installOpenClawPlugin(): number {
     return 1;
   }
 
-  const extensionDirectory = getOpenClawClaudeMemExtensionDirectory();
+  const extensionDirectory = getOpenClawLlmMemExtensionDirectory();
   const destinationDistDirectory = path.join(extensionDirectory, 'dist');
 
   const manifestPath = findPluginManifestPath();
@@ -215,7 +215,7 @@ function copyPluginFilesAndRegister(
 export function uninstallOpenClawPlugin(): number {
   let hasErrors = false;
 
-  const extensionDirectory = getOpenClawClaudeMemExtensionDirectory();
+  const extensionDirectory = getOpenClawLlmMemExtensionDirectory();
   if (existsSync(extensionDirectory)) {
     try {
       rmSync(extensionDirectory, { recursive: true, force: true });
@@ -240,10 +240,10 @@ export function uninstallOpenClawPlugin(): number {
 }
 
 export function checkOpenClawStatus(): number {
-  console.log('\nClaude-Mem OpenClaw Integration Status\n');
+  console.log('\nllm-mem OpenClaw Integration Status\n');
 
   const configDirectory = getOpenClawConfigDirectory();
-  const extensionDirectory = getOpenClawClaudeMemExtensionDirectory();
+  const extensionDirectory = getOpenClawLlmMemExtensionDirectory();
   const configFilePath = getOpenClawConfigFilePath();
   const pluginEntryPoint = path.join(extensionDirectory, 'dist', 'index.js');
 
@@ -285,14 +285,14 @@ export function checkOpenClawStatus(): number {
 }
 
 export async function installOpenClawIntegration(): Promise<number> {
-  console.log('\nInstalling Claude-Mem for OpenClaw...\n');
+  console.log('\nInstalling llm-mem for OpenClaw...\n');
 
   const pluginResult = installOpenClawPlugin();
   if (pluginResult !== 0) {
     return pluginResult;
   }
 
-  const extensionDirectory = getOpenClawClaudeMemExtensionDirectory();
+  const extensionDirectory = getOpenClawLlmMemExtensionDirectory();
 
   console.log(`
 Installation complete!

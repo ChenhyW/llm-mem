@@ -163,7 +163,7 @@ function mergeAndWriteHooksJson(
 }
 
 export async function installWindsurfHooks(): Promise<number> {
-  console.log('\nInstalling Claude-Mem Windsurf hooks (user level)...\n');
+  console.log('\nInstalling llm-mem Windsurf hooks (user level)...\n');
 
   const workerServicePath = findWorkerServicePath();
   if (!workerServicePath) {
@@ -286,11 +286,11 @@ async function fetchWindsurfContextFromWorker(
 }
 
 export function uninstallWindsurfHooks(): number {
-  console.log('\nUninstalling Claude-Mem Windsurf hooks...\n');
+  console.log('\nUninstalling llm-mem Windsurf hooks...\n');
 
   if (existsSync(WINDSURF_HOOKS_JSON_PATH)) {
     try {
-      removeClaudeMemHookEntries();
+      removeLlmMemHookEntries();
     } catch (error) {
       if (error instanceof Error) {
         logger.error('WORKER', 'Could not parse hooks.json during uninstall', { path: WINDSURF_HOOKS_JSON_PATH }, error);
@@ -315,7 +315,7 @@ export function uninstallWindsurfHooks(): number {
   }
 }
 
-function removeClaudeMemHookEntries(): void {
+function removeLlmMemHookEntries(): void {
   const parsed = JSON.parse(readFileSync(WINDSURF_HOOKS_JSON_PATH, 'utf-8')) as Partial<WindsurfHooksJson>;
   const config: WindsurfHooksJson = { hooks: parsed.hooks ?? {} };
 
@@ -355,7 +355,7 @@ function removeWindsurfContextAndUnregister(workspaceRoot: string): void {
 }
 
 export function checkWindsurfHooksStatus(): number {
-  console.log('\nClaude-Mem Windsurf Hooks Status\n');
+  console.log('\nllm-mem Windsurf Hooks Status\n');
 
   if (existsSync(WINDSURF_HOOKS_JSON_PATH)) {
     console.log(`User-level: Installed`);

@@ -49,7 +49,7 @@ interface McpInstallerConfig {
 
 function installMcpIntegration(config: McpInstallerConfig): () => Promise<number> {
   return async (): Promise<number> => {
-    console.log(`\nInstalling Claude-Mem MCP integration for ${config.ideLabel}...\n`);
+    console.log(`\nInstalling llm-mem MCP integration for ${config.ideLabel}...\n`);
 
     const mcpServerPath = getMcpServerAbsolutePath();
     if (!mcpServerPath) {
@@ -141,12 +141,12 @@ function getGooseConfigPath(): string {
   return path.join(homedir(), '.config', 'goose', 'config.yaml');
 }
 
-function gooseConfigHasClaudeMemEntry(yamlContent: string): boolean {
+function gooseConfigHasLlmMemEntry(yamlContent: string): boolean {
   return yamlContent.includes('llm-mem:') &&
     yamlContent.includes('mcpServers:');
 }
 
-function buildGooseClaudeMemEntryYaml(mcpServerPath: string, withHeader = false): string {
+function buildGooseLlmMemEntryYaml(mcpServerPath: string, withHeader = false): string {
   return [
     ...(withHeader ? ['mcpServers:'] : []),
     '  llm-mem:',
@@ -157,7 +157,7 @@ function buildGooseClaudeMemEntryYaml(mcpServerPath: string, withHeader = false)
 }
 
 export async function installGooseMcpIntegration(): Promise<number> {
-  console.log('\nInstalling Claude-Mem MCP integration for Goose...\n');
+  console.log('\nInstalling llm-mem MCP integration for Goose...\n');
 
   const mcpServerPath = getMcpServerAbsolutePath();
   if (!mcpServerPath) {
@@ -184,20 +184,20 @@ function mergeGooseYamlConfig(configPath: string, mcpServerPath: string): void {
   if (existsSync(configPath)) {
     let yamlContent = readFileSync(configPath, 'utf-8');
 
-    if (gooseConfigHasClaudeMemEntry(yamlContent)) {
-      const claudeMemPattern = /( {2}llm-mem:\n(?:.*\n)*?(?= {2}\S|\n\n|^\S|$))/m;
-      const newEntry = buildGooseClaudeMemEntryYaml(mcpServerPath) + '\n';
+    if (gooseConfigHasLlmMemEntry(yamlContent)) {
+      const llmMemPattern = /( {2}llm-mem:\n(?:.*\n)*?(?= {2}\S|\n\n|^\S|$))/m;
+      const newEntry = buildGooseLlmMemEntryYaml(mcpServerPath) + '\n';
 
-      if (!claudeMemPattern.test(yamlContent)) {
+      if (!llmMemPattern.test(yamlContent)) {
         throw new Error('Found mcpServers/llm-mem markers but could not locate a replaceable llm-mem block');
       }
-      yamlContent = yamlContent.replace(claudeMemPattern, newEntry);
+      yamlContent = yamlContent.replace(llmMemPattern, newEntry);
       writeFileSync(configPath, yamlContent);
       console.log(`  Updated existing llm-mem entry in: ${configPath}`);
     } else if (yamlContent.includes('mcpServers:')) {
       const mcpServersIndex = yamlContent.indexOf('mcpServers:');
       const insertionPoint = mcpServersIndex + 'mcpServers:'.length;
-      const newEntry = '\n' + buildGooseClaudeMemEntryYaml(mcpServerPath);
+      const newEntry = '\n' + buildGooseLlmMemEntryYaml(mcpServerPath);
 
       yamlContent =
         yamlContent.slice(0, insertionPoint) +
@@ -207,13 +207,13 @@ function mergeGooseYamlConfig(configPath: string, mcpServerPath: string): void {
       writeFileSync(configPath, yamlContent);
       console.log(`  Added llm-mem to existing mcpServers in: ${configPath}`);
     } else {
-      const mcpBlock = '\n' + buildGooseClaudeMemEntryYaml(mcpServerPath, true) + '\n';
+      const mcpBlock = '\n' + buildGooseLlmMemEntryYaml(mcpServerPath, true) + '\n';
       yamlContent = yamlContent.trimEnd() + '\n' + mcpBlock;
       writeFileSync(configPath, yamlContent);
       console.log(`  Appended mcpServers section to: ${configPath}`);
     }
   } else {
-    const templateContent = buildGooseClaudeMemEntryYaml(mcpServerPath, true) + '\n';
+    const templateContent = buildGooseLlmMemEntryYaml(mcpServerPath, true) + '\n';
     writeFileSync(configPath, templateContent);
     console.log(`  Created config with MCP server: ${configPath}`);
   }

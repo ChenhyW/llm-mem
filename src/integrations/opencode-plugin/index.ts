@@ -186,7 +186,7 @@ function truncate(text: string): string {
     : text;
 }
 
-export const ClaudeMemPlugin = async (ctx: OpenCodePluginContext) => {
+export const LlmMemPlugin = async (ctx: OpenCodePluginContext) => {
   const projectName = ctx.project?.name || "opencode";
 
   console.log(`[llm-mem] OpenCode plugin loading (project: ${projectName})`);
@@ -274,7 +274,7 @@ export const ClaudeMemPlugin = async (ctx: OpenCodePluginContext) => {
     },
 
     tool: {
-      claude_mem_search: {
+      llm_mem_search: {
         description:
           "Search llm-mem memory database for past observations, sessions, and context",
         args: {
@@ -337,4 +337,4 @@ export function parseSearchResponse(text: string, query: string): string {
   return rendered;
 }
 
-export default ClaudeMemPlugin;
+export default LlmMemPlugin;

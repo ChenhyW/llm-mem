@@ -221,7 +221,7 @@ function setupRulesContextFile(): void {
 }
 
 export async function installAntigravityCliHooks(): Promise<number> {
-  console.log('\nInstalling Claude-Mem Antigravity CLI hooks + MCP...\n');
+  console.log('\nInstalling llm-mem Antigravity CLI hooks + MCP...\n');
 
   const workerServicePath = findWorkerServicePath();
   if (!workerServicePath) {
@@ -299,7 +299,7 @@ function readMcpConfigTolerantly(mcpConfigPath: string): Record<string, any> {
   return readJsonSafe<Record<string, any>>(mcpConfigPath, {});
 }
 
-function removeClaudeMemFromMcpConfig(mcpConfigPath: string): boolean {
+function removeLlmMemFromMcpConfig(mcpConfigPath: string): boolean {
   if (!existsSync(mcpConfigPath)) return false;
 
   const config = readMcpConfigTolerantly(mcpConfigPath);
@@ -325,7 +325,7 @@ function removeContextTagBlock(filePath: string): boolean {
 }
 
 export function uninstallAntigravityCliHooks(): number {
-  console.log('\nUninstalling Claude-Mem Antigravity CLI hooks + MCP...\n');
+  console.log('\nUninstalling llm-mem Antigravity CLI hooks + MCP...\n');
 
   try {
     if (existsSync(GEMINI_SETTINGS_PATH)) {
@@ -335,7 +335,7 @@ export function uninstallAntigravityCliHooks(): number {
     }
 
     for (const mcpConfigPath of ANTIGRAVITY_MCP_CONFIG_PATHS) {
-      const removed = removeClaudeMemFromMcpConfig(mcpConfigPath);
+      const removed = removeLlmMemFromMcpConfig(mcpConfigPath);
       if (removed) {
         console.log(`  Removed llm-mem entry from ${mcpConfigPath}`);
       }
@@ -393,7 +393,7 @@ function removeAntigravityHooksFromSettings(): void {
 }
 
 export function checkAntigravityCliHooksStatus(): number {
-  console.log('\nClaude-Mem Antigravity CLI Status\n');
+  console.log('\nllm-mem Antigravity CLI Status\n');
 
   if (!existsSync(GEMINI_SETTINGS_PATH)) {
     console.log('Antigravity CLI settings: Not found');
@@ -419,10 +419,10 @@ export function checkAntigravityCliHooksStatus(): number {
   const installedEvents: string[] = [];
   if (settings.hooks) {
     for (const [eventName, groups] of Object.entries(settings.hooks)) {
-      const hasClaudeMem = groups.some(group =>
+      const hasLlmMem = groups.some(group =>
         group.hooks.some(hook => hook.name === HOOK_NAME)
       );
-      if (hasClaudeMem) {
+      if (hasLlmMem) {
         installedEvents.push(eventName);
       }
     }
@@ -480,7 +480,7 @@ export async function handleAntigravityCliCommand(subcommand: string, _args: str
 
     default:
       console.log(`
-Claude-Mem Antigravity CLI Integration
+llm-mem Antigravity CLI Integration
 
 Usage: llm-mem antigravity-cli <command>
 

@@ -39,7 +39,7 @@ export function Header({
         <h1>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <img
-              src="claude-mem-logomark.webp"
+              src="llm-mem-logomark.webp"
               alt=""
               className={`logomark ${isProcessing ? 'spinning' : ''}`}
             />

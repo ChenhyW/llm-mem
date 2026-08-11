@@ -11,7 +11,7 @@ import { dirname, join } from 'path';
 import { SettingsDefaultsManager, type SettingsDefaults } from '../../shared/SettingsDefaultsManager.js';
 import { USER_SETTINGS_PATH } from '../../shared/paths.js';
 import { parseJsonWithBom, writeJsonFileAtomic as writeSettingsJsonAtomic } from '../../shared/atomic-json.js';
-import { loadClaudeMemEnv, saveClaudeMemEnv } from '../../shared/EnvManager.js';
+import { loadLlmMemEnv, saveLlmMemEnv } from '../../shared/EnvManager.js';
 import { ensureWorkerStarted, type WorkerStartResult } from '../../services/worker-spawner.js';
 import { formatHostForUrl } from '../../shared/worker-utils.js';
 import {
@@ -591,7 +591,7 @@ async function promptForIDESelection(): Promise<string[]> {
   const claudeCodeInfo = detectedIDEs.find((ide) => ide.id === 'claude-code');
 
   if (claudeCodeInfo && !claudeCodeInfo.detected) {
-    log.warn('Claude Code is not installed. Claude-mem works best in Claude Code, but also works with the IDEs below.');
+    log.warn('Claude Code is not installed. llm-mem works best in Claude Code, but also works with the IDEs below.');
     const choice = await p.select<'install' | 'skip' | 'cancel'>({
       message: 'Install Claude Code now?',
       options: [
@@ -833,7 +833,7 @@ function readRawStoredAuthMethod(): 'subscription' | 'api-key' | 'gateway' | und
 function resolveClaudeAuthMethod(): 'subscription' | 'api-key' | 'gateway' {
   const stored = readRawStoredAuthMethod();
   if (stored) return stored;
-  const env = loadClaudeMemEnv();
+  const env = loadLlmMemEnv();
   if (env.ANTHROPIC_BASE_URL?.trim()) return 'gateway';
   if (env.ANTHROPIC_API_KEY?.trim()) return 'api-key';
   return 'subscription';
@@ -966,7 +966,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
 
   const useSubscriptionAuth = () => {
     persistClaudeProvider('subscription');
-    saveClaudeMemEnv({
+    saveLlmMemEnv({
       ANTHROPIC_API_KEY: '',
       ANTHROPIC_BASE_URL: '',
       ANTHROPIC_AUTH_TOKEN: '',
@@ -975,7 +975,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
   };
 
   const configureDirectApiKey = async (): Promise<void> => {
-    const existing = loadClaudeMemEnv().ANTHROPIC_API_KEY || '';
+    const existing = loadLlmMemEnv().ANTHROPIC_API_KEY || '';
     if (existing.trim().length > 0) {
       const choice = await p.select<'keep' | 'replace'>({
         message: 'An Anthropic API key is already configured. Keep it or enter a new one?',
@@ -990,7 +990,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
         return;
       }
       if (choice === 'keep') {
-        saveClaudeMemEnv({
+        saveLlmMemEnv({
           ANTHROPIC_API_KEY: existing.trim(),
           ANTHROPIC_BASE_URL: '',
           ANTHROPIC_AUTH_TOKEN: '',
@@ -1011,7 +1011,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
       return;
     }
 
-    saveClaudeMemEnv({
+    saveLlmMemEnv({
       ANTHROPIC_API_KEY: String(apiKeyResult).trim(),
       ANTHROPIC_BASE_URL: '',
       ANTHROPIC_AUTH_TOKEN: '',
@@ -1021,7 +1021,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
   };
 
   const configureGateway = async (): Promise<void> => {
-    const existing = loadClaudeMemEnv();
+    const existing = loadLlmMemEnv();
     const baseUrlResult = await p.text({
       message: 'Gateway URL:',
       placeholder: existing.ANTHROPIC_BASE_URL || 'http://localhost:4000',
@@ -1058,7 +1058,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
     if (!tokenCancelled && tokenInput.length > 0) {
       env.ANTHROPIC_AUTH_TOKEN = tokenInput;
     }
-    saveClaudeMemEnv(env);
+    saveLlmMemEnv(env);
     persistClaudeProvider('gateway');
     if (tokenCancelled || tokenInput.length === 0) {
       log.info('Gateway URL saved; existing gateway token preserved.');
@@ -1110,7 +1110,7 @@ async function promptProvider(options: InstallOptions): Promise<ProviderId> {
         { value: 'direct', label: 'Anthropic API key' },
         { value: 'gateway', label: 'LiteLLM or custom gateway' },
       ],
-      initialValue: resolvedAuthMethod === 'gateway' || loadClaudeMemEnv().ANTHROPIC_BASE_URL ? 'gateway' : 'direct',
+      initialValue: resolvedAuthMethod === 'gateway' || loadLlmMemEnv().ANTHROPIC_BASE_URL ? 'gateway' : 'direct',
     });
 
     if (p.isCancel(apiModeResult)) {

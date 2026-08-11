@@ -45,7 +45,7 @@ const BLOCKED_ENV_VARS = [
   'CLAUDE_CODE_ALWAYS_ENABLE_EFFORT',
 ];
 
-export interface ClaudeMemEnv {
+export interface LlmMemEnv {
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_BASE_URL?: string;
   ANTHROPIC_AUTH_TOKEN?: string;
@@ -71,7 +71,7 @@ const CREDENTIAL_KEYS = [
 // Node's stdlib .env parser (util.parseEnv, Node ≥20.12 / stable in 24):
 // handles `#` comments, blank lines, KEY=VALUE, and quote-stripping. The
 // downstream CREDENTIAL_KEYS whitelist still filters the result — arbitrary
-// keys in the file never reach a ClaudeMemEnv. serializeEnvFile is kept custom
+// keys in the file never reach a LlmMemEnv. serializeEnvFile is kept custom
 // (header banner + selective quoting; no stdlib equivalent).
 function parseEnvFile(content: string): Record<string, string> {
   return parseEnv(content) as Record<string, string>;
@@ -108,7 +108,7 @@ function serializeEnvFile(env: Record<string, string>): string {
  * five named keys are ever copied out (see CREDENTIAL_KEYS for why this must
  * not become Object.assign(result, parsed)).
  */
-export function loadClaudeMemEnv(): ClaudeMemEnv {
+export function loadLlmMemEnv(): LlmMemEnv {
   const envFile = envFilePath();
   if (!existsSync(envFile)) {
     return {};
@@ -118,7 +118,7 @@ export function loadClaudeMemEnv(): ClaudeMemEnv {
     const content = readFileSync(envFile, 'utf-8');
     const parsed = parseEnvFile(content);
 
-    const result: ClaudeMemEnv = {};
+    const result: LlmMemEnv = {};
     for (const key of CREDENTIAL_KEYS) {
       if (parsed[key]) result[key] = parsed[key];
     }
@@ -130,7 +130,7 @@ export function loadClaudeMemEnv(): ClaudeMemEnv {
   }
 }
 
-export function saveClaudeMemEnv(env: ClaudeMemEnv): void {
+export function saveLlmMemEnv(env: LlmMemEnv): void {
   const envFile = envFilePath();
   let existing: Record<string, string> = {};
   try {
@@ -183,7 +183,7 @@ export function buildIsolatedEnv(includeCredentials: boolean = true): Record<str
   isolatedEnv.LLM_MEM_INTERNAL = '1';
 
   if (includeCredentials) {
-    const credentials = loadClaudeMemEnv();
+    const credentials = loadLlmMemEnv();
 
     for (const key of CREDENTIAL_KEYS) {
       const value = credentials[key];
@@ -234,7 +234,7 @@ export async function buildIsolatedEnvWithFreshOAuth(
   //
   // Post-#2375: ANTHROPIC_BASE_URL is in BLOCKED_ENV_VARS, so it can ONLY be
   // present in isolatedEnv when the user intentionally configured it in
-  // ~/.llm-mem/.env (see loadClaudeMemEnv re-injection above). A BASE_URL
+  // ~/.llm-mem/.env (see loadLlmMemEnv re-injection above). A BASE_URL
   // leaked from the parent shell no longer reaches this predicate — that was
   // the root cause of #2375 (leaked BASE_URL → OAuth-skip → no credential at
   // all). Keeping the BASE_URL branch here is therefore the *security*-correct
@@ -294,18 +294,18 @@ export async function buildIsolatedEnvWithFreshOAuth(
   return isolatedEnv;
 }
 
-export function getCredential(key: keyof ClaudeMemEnv): string | undefined {
-  const env = loadClaudeMemEnv();
+export function getCredential(key: keyof LlmMemEnv): string | undefined {
+  const env = loadLlmMemEnv();
   return env[key];
 }
 
 export function hasAnthropicApiKey(): boolean {
-  const env = loadClaudeMemEnv();
+  const env = loadLlmMemEnv();
   return !!env.ANTHROPIC_API_KEY;
 }
 
 export function hasAnthropicAuthToken(): boolean {
-  const env = loadClaudeMemEnv();
+  const env = loadLlmMemEnv();
   return !!env.ANTHROPIC_AUTH_TOKEN;
 }
 

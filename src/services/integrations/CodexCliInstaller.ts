@@ -235,7 +235,7 @@ function isLegacyMcpSearchChildHeader(normalizedHeader: string | null): boolean 
   return typeof normalizedHeader === 'string' && normalizedHeader.startsWith('mcp_servers.mcp-search.');
 }
 
-function isClaudeMemMcpSearchBlock(block: string): boolean {
+function isLlmMemMcpSearchBlock(block: string): boolean {
   return /llm-mem/.test(block);
 }
 
@@ -258,7 +258,7 @@ export function removeLegacyCodexMcpSearchConfig(content: string): string {
   blocks.push({ header: currentHeader, text: currentLines.join('\n') });
 
   const removeLegacyMcpSearch = blocks.some(
-    (block) => isLegacyMcpSearchHeader(block.header) && isClaudeMemMcpSearchBlock(block.text),
+    (block) => isLegacyMcpSearchHeader(block.header) && isLlmMemMcpSearchBlock(block.text),
   );
   if (!removeLegacyMcpSearch) return content;
 
@@ -431,7 +431,7 @@ function stripLegacyTranscriptWatchContexts(): void {
 const cleanupLegacyCodexTranscriptAgentsContext = disableCodexTranscriptAgentsContext;
 
 export async function installCodexCli(marketplaceRootOverride?: string): Promise<number> {
-  console.log('\nInstalling Claude-Mem for Codex CLI (native hooks)...\n');
+  console.log('\nInstalling llm-mem for Codex CLI (native hooks)...\n');
 
   if (!commandExists('codex')) {
     console.error('Codex CLI was not found on PATH.');
@@ -481,7 +481,7 @@ For a fresh setup, the supported entry point is:
 }
 
 export function uninstallCodexCli(): number {
-  console.log('\nUninstalling Claude-Mem Codex CLI integration...\n');
+  console.log('\nUninstalling llm-mem Codex CLI integration...\n');
 
   let failed = false;
 
