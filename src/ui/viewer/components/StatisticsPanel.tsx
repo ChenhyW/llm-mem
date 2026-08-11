@@ -92,6 +92,104 @@ function useStats(periodDays: number, project: string) {
   return { overview, series, sessions, sessionsOffset, sessionsHasMore, loading, error, loadMoreSessions };
 }
 
+const CHART_WIDTH = 720;
+const CHART_HEIGHT = 180;
+const PAD_L = 8;
+const PAD_R = 12;
+const PAD_T = 12;
+const PAD_B = 22;
+
+function useLineChart(
+  series: StatsTimeSeriesRow[],
+  selectedMetrics: Set<TrendMetric>,
+  setSelectedMetrics: React.Dispatch<React.SetStateAction<Set<TrendMetric>>>
+) {
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+
+  const maxVal = useMemo(() => {
+    const keys = [...selectedMetrics];
+    if (keys.length === 0) return 0;
+    return Math.max(0, ...series.flatMap(r => keys.map(k => r[k] as number)));
+  }, [series, selectedMetrics]);
+
+  const linePathByMetric = useMemo(() => {
+    const n = series.length;
+    const plotW = CHART_WIDTH - PAD_L - PAD_R;
+    const plotH = CHART_HEIGHT - PAD_T - PAD_B;
+    const out: Record<string, string> = {};
+    for (const m of METRICS) {
+      const pts = series.map((r, i) => {
+        const x = PAD_L + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+        const y = PAD_T + (maxVal > 0 ? plotH - (r[m.key] as number) / maxVal * plotH : plotH / 2);
+        return [x, y];
+      });
+      out[m.key] = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    }
+    return out;
+  }, [series, maxVal]);
+
+  const xForIdx = useMemo(() => {
+    const n = series.length;
+    const plotW = CHART_WIDTH - PAD_L - PAD_R;
+    return (i: number) => PAD_L + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  }, [series]);
+
+  const isTodayIdx = useMemo(
+    () => series.findIndex(r => r.date === todayStr),
+    [series, todayStr]
+  );
+
+  const [hoverIdx, setHoverIdx] = useState(-1);
+  const [hoverPos, setHoverPos] = useState<[number, number] | null>(null);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = (CHART_WIDTH - PAD_L - PAD_R) / rect.width;
+    const localX = (e.clientX - rect.left) * ratio + PAD_L;
+    const n = series.length;
+    if (n === 0) { setHoverIdx(-1); setHoverPos(null); return; }
+    const xs = Array.from({ length: n }, (_, i) => xForIdx(i));
+    let best = 0;
+    let bd = Infinity;
+    for (let i = 0; i < n; i++) { const d = Math.abs(xs[i] - localX); if (d < bd) { bd = d; best = i; } }
+    setHoverIdx(best);
+    setHoverPos([xForIdx(best), PAD_T]);
+  }, [series, xForIdx]);
+
+  const handleMouseOut = useCallback(() => { setHoverIdx(-1); setHoverPos(null); }, []);
+
+  const activeSeriesFor = useCallback((m: TrendMetric) => {
+    return [...selectedMetrics].includes(m) && hoverIdx >= 0 ? hoverIdx : -1;
+  }, [selectedMetrics, hoverIdx]);
+
+  const [activeMetricTooltip, setActiveMetricTooltip] = useState<TrendMetric | null>(null);
+  const handleMetricClick = useCallback((m: TrendMetric) => {
+    setActiveMetricTooltip(t => (t === m ? null : m));
+  }, []);
+
+  const toggleMetric = useCallback((m: TrendMetric) => {
+    setSelectedMetrics(prev => {
+      const next = new Set(prev);
+      if (next.has(m)) {
+        if (next.size > 1) next.delete(m);
+      } else {
+        next.add(m);
+      }
+      return next;
+    });
+  }, []);
+
+  const metricMeta = METRICS.find(m => m.key === 'total_tokens') || METRICS[0];
+
+  return {
+    metricMeta, maxVal, linePathByMetric, activeSeriesFor,
+    handleMetricClick, toggleMetric, handleMouseMove, handleMouseOut,
+    activeMetricTooltip, xForIdx, series, isTodayIdx, hoverIdx, hoverPos,
+    chartWidth: CHART_WIDTH, chartHeight: CHART_HEIGHT, padding: PAD_L,
+    setHoverIdx, setActiveMetricTooltip,
+  };
+}
+
 export function StatisticsPanel({ projects, currentProject }: StatisticsPanelProps) {
   // Panel-own project state. Initialized from header's filter when opening
   // the tab, but after that fully owned by the user's dropdown here so it
@@ -100,8 +198,11 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
     currentProject || (projects.length > 0 ? projects[0] : '')
   );
   const [periodDays, setPeriodDays] = useState(7);
-  const [metric, setMetric] = useState<TrendMetric>('total_tokens');
+  const [selectedMetrics, setSelectedMetrics] = useState<Set<TrendMetric>>(
+    () => new Set(['total_tokens', 'input_tokens', 'output_tokens'])
+  );
   const [sessionSort, setSessionSort] = useState<SessionSort>('tokens');
+  const [chartHover, setChartHover] = useState<{ idx: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (selectedProject && !projects.includes(selectedProject)) {
@@ -113,8 +214,12 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
     overview, series, sessions, sessionsOffset, sessionsHasMore, loading, error, loadMoreSessions
   } = useStats(periodDays, selectedProject);
 
-  const metricMeta = METRICS.find(m => m.key === metric) || METRICS[0];
-  const maxVal = useMemo(() => Math.max(0, ...series.map(r => r[metric] as number)), [series, metric]);
+  const {
+    metricMeta, maxVal, linePathByMetric, activeSeriesFor,
+    handleMetricClick, toggleMetric, handleMouseMove, handleMouseOut,
+    activeMetricTooltip, xForIdx, isTodayIdx, hoverIdx,
+    chartWidth, chartHeight
+  } = useLineChart(series, selectedMetrics, setSelectedMetrics);
 
   const cards = useMemo(() => {
     if (!overview) return null;
@@ -251,31 +356,57 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
         }
         .stats-chart {
           border-top: 1px solid var(--color-border-secondary, #eee);
-          padding-top: 10px;
+          padding-top: 12px;
+          position: relative;
         }
-        .stats-chart-plot {
-          display: flex; align-items: flex-end; gap: 2px;
-          height: 120px; padding: 6px 0 0; position: relative;
+        .stats-chart-svg {
+          width: 100%; height: auto; display: block;
+          font-family: ui-monospace, SF Mono, Menlo, monospace;
         }
-        .stats-chart-max {
-          position: absolute; top: -2px; right: 4px;
-          font-size: 11px; font-weight: 600;
+        .stats-chart-ytext, .stats-chart-xtext {
+          font-size: 9px; fill: var(--color-text-muted, #999);
         }
-        .stats-bar-wrap {
-          flex: 1 1 0; display: flex; flex-direction: column;
-          align-items: center; justify-content: flex-end;
-          height: 100%; min-width: 0;
+        .stats-chart-tooltip-date {
+          font-size: 11px; font-weight: 600; fill: var(--color-text-primary, #222);
         }
-        .stats-bar {
-          width: 100%; min-height: 2px; border-radius: 2px 2px 0 0;
-          transition: opacity 0.15s;
+        .stats-chart-tooltip-line {
+          font-size: 11px; cursor: pointer;
         }
-        .stats-bar-wrap:hover .stats-bar { opacity: 0.75; }
-        .stats-bar-wrap.today .stats-bar { box-shadow: 0 0 0 1px currentColor; }
-        .stats-bar-label {
+        .stats-chart-tooltip-line:hover { font-weight: 600; }
+        .stats-chart-tooltip-sub {
+          font-size: 9px; fill: var(--color-text-secondary, #666);
+        }
+        .stats-chart-legend {
+          display: flex; justify-content: space-between;
+          font-size: 11px; color: var(--color-text-muted, #999);
+          padding: 4px 4px 0;
+        }
+        .stats-metric-checks {
+          display: flex; flex-wrap: wrap; gap: 6px;
+          margin: 10px 0 12px;
+        }
+        .stats-metric-check {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 5px 10px; border-radius: 6px;
+          border: 1px solid var(--color-border-secondary, #ccc);
+          background: transparent;
+          color: var(--color-text-secondary, #555);
+          cursor: pointer; font-size: 12px;
+          transition: all 0.15s;
+          user-select: none;
+        }
+        .stats-metric-check:hover {
+          background: var(--color-bg-secondary, #f3f3f3);
+        }
+        .stats-metric-check.active {
+          background: var(--color-bg-tertiary, #f0f0f0);
+          font-weight: 500;
+        }
+        .stats-metric-dot {
+          display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+        }
+        .stats-metric-unit {
           font-size: 10px; color: var(--color-text-muted, #999);
-          margin-top: 4px; white-space: nowrap; overflow: hidden;
-          text-overflow: ellipsis; width: 100%; text-align: center;
         }
         .stats-sessions-section {
           border: 1px solid var(--color-border-secondary, #ddd);
@@ -410,50 +541,192 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
       <div className="stats-trend-section">
         <div className="stats-trend-header">
           <h3>日趋势</h3>
-          <div className="stats-metric-tabs">
-            {METRICS.map(m => (
-              <button
-                key={m.key}
-                type="button"
-                className={`stats-metric-tab ${metric === m.key ? 'active' : ''}`}
-                style={metric === m.key ? { color: m.color, borderColor: m.color } : {}}
-                onClick={() => setMetric(m.key)}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
+        </div>
+        <div className="stats-metric-checks">
+          {METRICS.map(m => (
+            <label
+              key={m.key}
+              className={`stats-metric-check ${selectedMetrics.has(m.key) ? 'active' : ''}`}
+              style={selectedMetrics.has(m.key) ? { color: m.color, borderColor: m.color } : {}}
+              onClick={() => toggleMetric(m.key)}
+            >
+              <span className="stats-metric-dot" style={{ background: m.color }} />
+              <span className="stats-metric-name">{m.label}</span>
+              <span className="stats-metric-unit">{m.unit}</span>
+            </label>
+          ))}
         </div>
 
-        <div className="stats-chart" role="img" aria-label={`日趋势图：${metricMeta.label}`}>
-          <div className="stats-chart-plot">
-            {series.length > 0 && (
-              <div className="stats-chart-max" style={{ color: metricMeta.color }}>
-                最高 {fmt(maxVal)} {metricMeta.unit}
-              </div>
+        <div className="stats-chart">
+          <svg
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            preserveAspectRatio="none"
+            className="stats-chart-svg"
+            onMouseMove={handleMouseMove}
+            onMouseOut={handleMouseOut}
+            role="img"
+            aria-label="日趋势折线图"
+          >
+            <defs>
+              <linearGradient id="chart-grid-fade" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="transparent" />
+                <stop offset="100%" stopColor="var(--color-border-secondary, #eee)" stopOpacity="0.4" />
+              </linearGradient>
+            </defs>
+
+            {maxVal > 0 && (
+              <g className="stats-chart-ylabels">
+                {[0, 0.5, 1].map((ratio, i) => {
+                  const y = PAD_T + (CHART_HEIGHT - PAD_T - PAD_B) * (1 - ratio);
+                  return (
+                    <g key={i}>
+                      <line
+                        x1={PAD_L}
+                        x2={CHART_WIDTH - PAD_R}
+                        y1={y}
+                        y2={y}
+                        stroke="var(--color-border-secondary, #eee)"
+                        strokeDasharray="2 3"
+                      />
+                      <text x={CHART_WIDTH - PAD_R + 1} y={y + 3} className="stats-chart-ytext">
+                        {fmt(maxVal * ratio)}
+                      </text>
+                    </g>
+          );
+                })}
+              </g>
             )}
-            {series.map((row, idx) => {
-              const val = row[metric] as number;
-              const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-              const isToday = row.date === new Date().toISOString().slice(0, 10);
+
+            <line
+              x1={PAD_L}
+              x2={CHART_WIDTH - PAD_R}
+              y1={CHART_HEIGHT - PAD_B}
+              y2={CHART_HEIGHT - PAD_B}
+              stroke="var(--color-border-secondary, #ccc)"
+            />
+
+            {METRICS.filter(m => selectedMetrics.has(m.key)).map(m => {
+              const active = activeSeriesFor(m.key);
               return (
-                <div
-                  key={idx}
-                  className={`stats-bar-wrap ${isToday ? 'today' : ''}`}
-                  title={`${row.date}\n${metricMeta.label}: ${fmt(val)}\n观察 ${row.observations} / 批 ${row.batches} / 摘要 ${row.summaries} / 调用 ${row.llm_calls}`}
-                >
-                  <div
-                    className="stats-bar"
-                    style={{
-                      height: `${Math.max(2, pct)}%`,
-                      background: metricMeta.color,
-                    }}
+                <g key={m.key}>
+                  <path
+                    d={linePathByMetric[m.key]}
+                    fill="none"
+                    stroke={m.color}
+                    strokeWidth={active >= 0 ? 2.5 : 1.6}
+                    strokeOpacity={active >= 0 ? 1 : 0.85}
+                    className="stats-chart-line"
                   />
-                  <div className="stats-bar-label" title={row.date}>{row.date.slice(5)}</div>
-                </div>
+                  {series.map((row, i) => {
+                    const x = xForIdx(i);
+                    const y = PAD_T + (maxVal > 0
+                      ? (CHART_HEIGHT - PAD_T - PAD_B) * (1 - row[m.key] as number / maxVal)
+                      : (CHART_HEIGHT - PAD_T - PAD_B) / 2);
+                    const isActive = active === i;
+                    const isToday = row.date === new Date().toISOString().slice(0, 10);
+                    return (
+                      <circle
+                        key={i}
+                        cx={x}
+                        cy={y}
+                        r={isActive ? 4 : 2}
+                        fill={isActive ? m.color : 'var(--color-bg-card, #fff)'}
+                        stroke={m.color}
+                        strokeWidth={isActive ? 0 : 1.5}
+                        style={isToday && !isActive ? { strokeDasharray: '2 2' } : {}}
+                        onClick={() => handleMetricClick(m.key)}
+                      />
+                    );
+                  })}
+                </g>
               );
             })}
-          </div>
+
+            {hoverIdx >= 0 && (
+              <line
+                x1={xForIdx(hoverIdx)}
+                x2={xForIdx(hoverIdx)}
+                y1={PAD_T}
+                y2={CHART_HEIGHT - PAD_B}
+                stroke="var(--color-border-primary, #999)"
+                strokeDasharray="3 3"
+                strokeWidth="1"
+              />
+            )}
+
+            {isTodayIdx >= 0 && isTodayIdx !== hoverIdx && (
+              <line
+                x1={xForIdx(isTodayIdx)}
+                x2={xForIdx(isTodayIdx)}
+                y1={PAD_T}
+                y2={CHART_HEIGHT - PAD_B}
+                stroke="var(--color-accent-primary, #6366f1)"
+                strokeDasharray="4 2"
+                strokeWidth="1"
+                strokeOpacity="0.6"
+              />
+            )}
+
+            {hoverIdx >= 0 && series[hoverIdx] && (
+              <g className="stats-chart-tooltip"
+                transform={`translate(${xForIdx(hoverIdx)}, ${PAD_T - 2})`}>
+                <rect
+                  x={-96} y={-10}
+                  width={192} height={18 + selectedMetrics.size * 14 + (activeMetricTooltip ? 16 : 0)}
+                  fill="var(--color-bg-card, #fff)"
+                  stroke="var(--color-border-primary, #ccc)"
+                  rx={4}
+                />
+                <text x={-90} y={2} className="stats-chart-tooltip-date">
+                  {series[hoverIdx].date}
+                </text>
+                {[...selectedMetrics].map((m, i) => {
+                  const row = series[hoverIdx];
+                  const mMeta = METRICS.find(x => x.key === m)!;
+                  const showDetail = activeMetricTooltip === m;
+                  return (
+                    <g key={m} onClick={() => handleMetricClick(m)}>
+                      <text x={-90} y={18 + i * 14} className="stats-chart-tooltip-line" fill={mMeta.color}>
+                        {mMeta.label}: {fmt(row[m] as number)} {mMeta.unit}
+                      </text>
+                      {showDetail && (
+                        <text x={-90} y={18 + i * 14 + 14} className="stats-chart-tooltip-sub">
+                          观察 {row.observations} · 批 {row.batches} · 摘要 {row.summaries} · 调用 {row.llm_calls}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+              </g>
+            )}
+
+            <g className="stats-chart-xlabels">
+              {series.map((row, i) => {
+                const show = (i % Math.ceil(series.length / 8)) === 0 || i === series.length - 1 || i === isTodayIdx;
+                if (!show) return null;
+                return (
+                  <text
+                    key={i}
+                    x={xForIdx(i)}
+                    y={CHART_HEIGHT - PAD_B + 14}
+                    textAnchor="middle"
+                    className="stats-chart-xtext"
+                  >
+                    {row.date.slice(5)}
+                  </text>
+                );
+              })}
+            </g>
+          </svg>
+
+          {series.length > 0 && (
+            <div className="stats-chart-legend">
+              <span>今日</span>
+              <span className="stats-chart-max" style={{ color: metricMeta.color }}>
+                峰值 {fmt(maxVal)}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
