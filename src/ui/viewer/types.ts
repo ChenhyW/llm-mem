@@ -125,3 +125,46 @@ export interface DependencyStatus {
   kind: 'ok' | 'setup_required' | 'vector_search_unavailable' | 'vector_helper_unavailable';
   message?: string;
 }
+
+export interface StatsOverview {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  llm_calls: number;
+  observation_count: number;
+  batch_count: number;
+  session_count: number;
+  summary_count: number;
+  first_seen: string | null;
+  last_seen: string | null;
+  avg_input_tokens_per_call: number;
+  avg_output_tokens_per_call: number;
+}
+
+export interface StatsTimeSeriesRow {
+  date: string;
+  sessions: number;
+  observations: number;
+  batches: number;
+  summaries: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  llm_calls: number;
+}
+
+export interface StatsSessionRow {
+  session_id: string;
+  project: string;
+  platform_source: string;
+  date: string;
+  first_seen: string | null;
+  last_seen: string | null;
+  observations: number;
+  batches: number;
+  summaries: number;
+  llm_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}

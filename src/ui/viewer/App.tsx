@@ -11,8 +11,9 @@ import { usePagination } from './hooks/usePagination';
 import { useTheme } from './hooks/useTheme';
 import { Observation, Summary, UserPrompt } from './types';
 import { mergeAndDeduplicateByProject } from './utils/data';
+import { StatisticsPanel } from './components/StatisticsPanel';
 
-type AppTab = 'observations' | 'inject-test';
+type AppTab = 'observations' | 'inject-test' | 'stats';
 
 const TABS: Array<{ key: AppTab; label: string; icon: React.ReactNode }> = [
   {
@@ -37,6 +38,18 @@ const TABS: Array<{ key: AppTab; label: string; icon: React.ReactNode }> = [
         <polyline points="21 16 21 21 16 21" />
         <line x1="15" y1="15" x2="21" y2="21" />
         <line x1="4" y1="4" x2="9" y2="9" />
+      </svg>
+    ),
+  },
+  {
+    key: 'stats',
+    label: '使用统计',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="4" y1="20" x2="4" y2="10" />
+        <line x1="10" y1="20" x2="10" y2="4" />
+        <line x1="16" y1="20" x2="16" y2="14" />
+        <line x1="22" y1="20" x2="22" y2="2" />
       </svg>
     ),
   },
@@ -175,8 +188,10 @@ export function App() {
               <WelcomeCard onDismiss={() => setWelcomeDismissed(true)} />
             )}
           </>
-        ) : (
+        ) : appTab === 'inject-test' ? (
           <SemanticTestPanel projects={projects} currentProject={currentFilter} minChars={minChars} />
+        ) : (
+          <StatisticsPanel projects={projects} currentProject={currentFilter} />
         )}
       </div>
 

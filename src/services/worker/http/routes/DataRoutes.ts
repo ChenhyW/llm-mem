@@ -111,6 +111,9 @@ export class DataRoutes extends BaseRouteHandler {
     app.delete('/api/prompt/:id', this.handleDeletePrompt.bind(this));
 
     app.get('/api/stats', this.handleGetStats.bind(this));
+    app.get('/api/stats/tokens', this.handleGetStatsTokens.bind(this));
+    app.get('/api/stats/time', this.handleGetStatsByTime.bind(this));
+    app.get('/api/stats/sessions', this.handleGetStatsBySession.bind(this));
     app.get('/api/projects', this.handleGetProjects.bind(this));
 
     app.get('/api/processing-status', this.handleGetProcessingStatus.bind(this));
@@ -368,6 +371,35 @@ export class DataRoutes extends BaseRouteHandler {
     }
 
     res.json(store.getProjectCatalog());
+  });
+
+  private handleGetStatsTokens = this.wrapHandler((req: Request, res: Response): void => {
+    const project = DataRoutes.firstString(req.query.project);
+    const platformSource = this.getOptionalPlatformSourceFromRequest(req);
+    const overview = this.paginationHelper.getStatisticsOverview(project, platformSource);
+    res.json(overview);
+  });
+
+  private handleGetStatsByTime = this.wrapHandler((req: Request, res: Response): void => {
+    const daysRaw = req.query.days;
+    const days = daysRaw ? Math.max(1, Math.min(365 * 3, parseInt(daysRaw as string, 10) || 90)) : 90;
+    const project = DataRoutes.firstString(req.query.project);
+    const platformSource = this.getOptionalPlatformSourceFromRequest(req);
+    const rows = this.paginationHelper.getStatisticsByTime(days, project, platformSource);
+    res.json(rows);
+  });
+
+  private handleGetStatsBySession = this.wrapHandler((req: Request, res: Response): void => {
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+    const limit = Math.min(parseInt(req.query.limit as string, 10) || 50, 200);
+    const project = DataRoutes.firstString(req.query.project);
+    const platformSource = this.getOptionalPlatformSourceFromRequest(req);
+    const sortBy = DataRoutes.firstString(req.query.sortBy) || 'tokens';
+    const rows = this.paginationHelper.getStatisticsBySession(
+      offset, limit, project, platformSource,
+      sortBy === 'tokens' || sortBy === 'calls' || sortBy === 'date' ? sortBy as any : 'tokens'
+    );
+    res.json(rows);
   });
 
   private handleGetProcessingStatus = this.wrapHandler(async (req: Request, res: Response): Promise<void> => {

@@ -171,3 +171,51 @@ export interface DBSession {
 }
 
 export type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+
+// Statistics — LLM token / call cost rollups. Observation rows with
+// batch_index=1 represent one LLM invocation (each single observation counts as
+// one too, since batch_size=1, batch_index=1 by default). Session summaries
+// each represent one terminal "summarize" LLM call.
+export interface StatsOverview {
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  llm_calls: number;
+  observation_count: number;
+  batch_count: number;
+  session_count: number;
+  summary_count: number;
+  first_seen: string | null;
+  last_seen: string | null;
+  avg_input_tokens_per_call: number;
+  avg_output_tokens_per_call: number;
+}
+
+export interface StatsTimeSeriesRow {
+  date: string;          // YYYY-MM-DD
+  sessions: number;
+  observations: number;
+  batches: number;
+  summaries: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  llm_calls: number;
+}
+
+export interface StatsSessionRow {
+  id: number;
+  session_id: string;
+  project: string;
+  platform_source: string;
+  date: string;
+  first_seen: string | null;
+  last_seen: string | null;
+  observations: number;
+  batches: number;
+  summaries: number;
+  llm_calls: number;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+}

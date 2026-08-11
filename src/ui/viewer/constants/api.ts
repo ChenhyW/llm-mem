@@ -9,4 +9,7 @@ export const API_ENDPOINTS = {
   MCP_STATUS: '/api/mcp/status',
   SEMANTIC_CONTEXT: '/api/context/semantic',
   PROMPT_SEMANTIC_CONTEXT: '/api/prompts/semantic-context',
+  STATS_TOKENS: '/api/stats/tokens',
+  STATS_TIME: '/api/stats/time',
+  STATS_SESSIONS: '/api/stats/sessions',
 } as const;
