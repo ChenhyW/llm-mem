@@ -23,8 +23,6 @@ const METRICS: Array<{ key: TrendMetric; label: string; unit: string; color: str
 const PERIODS: Array<{ days: number; label: string }> = [
   { days: 7, label: '7 天' },
   { days: 30, label: '30 天' },
-  { days: 90, label: '90 天' },
-  { days: 365, label: '1 年' },
 ];
 
 function fmt(n: number, dec = 0): string {
@@ -101,7 +99,7 @@ export function StatisticsPanel({ projects, currentProject }: StatisticsPanelPro
   const [selectedProject, setSelectedProject] = useState(
     currentProject || (projects.length > 0 ? projects[0] : '')
   );
-  const [periodDays, setPeriodDays] = useState(90);
+  const [periodDays, setPeriodDays] = useState(7);
   const [metric, setMetric] = useState<TrendMetric>('total_tokens');
   const [sessionSort, setSessionSort] = useState<SessionSort>('tokens');
 
