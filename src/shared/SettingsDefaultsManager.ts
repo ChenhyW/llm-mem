@@ -87,26 +87,11 @@ export interface SettingsDefaults {
   LLM_MEM_TELEGRAM_CHAT_ID: string;
   LLM_MEM_TELEGRAM_TRIGGER_TYPES: string;
   LLM_MEM_TELEGRAM_TRIGGER_CONCEPTS: string;
-  LLM_MEM_QUEUE_ENGINE: string;
-  LLM_MEM_REDIS_URL: string;
-  LLM_MEM_REDIS_HOST: string;
-  LLM_MEM_REDIS_PORT: string;
-  LLM_MEM_REDIS_MODE: string;
-  LLM_MEM_QUEUE_REDIS_PREFIX: string;
   LLM_MEM_AUTH_MODE: string;
   LLM_MEM_RUNTIME: string;
   LLM_MEM_OLLAMA_URL: string;
   LLM_MEM_VECTOR_EMBEDDING_MODEL: string;
   LLM_MEM_DISABLE_VECTOR_SEARCH: string;
-  // Phase 1a (cmem-sdk rename): canonical server settings keys. Hooks read
-  // these first and fall back to the legacy `*_BETA_*` keys below.
-  LLM_MEM_SERVER_URL: string;
-  LLM_MEM_SERVER_API_KEY: string;
-  LLM_MEM_SERVER_PROJECT_ID: string;
-  // Legacy keys retained for back-compat with existing settings.json files.
-  LLM_MEM_SERVER_BETA_URL: string;
-  LLM_MEM_SERVER_BETA_API_KEY: string;
-  LLM_MEM_SERVER_BETA_PROJECT_ID: string;
 }
 
 export class SettingsDefaultsManager {
@@ -189,26 +174,11 @@ export class SettingsDefaultsManager {
     LLM_MEM_TELEGRAM_CHAT_ID: '',
     LLM_MEM_TELEGRAM_TRIGGER_TYPES: 'security_alert',
     LLM_MEM_TELEGRAM_TRIGGER_CONCEPTS: '',
-    LLM_MEM_QUEUE_ENGINE: 'sqlite',
-    LLM_MEM_REDIS_URL: '',
-    LLM_MEM_REDIS_HOST: '127.0.0.1',
-    LLM_MEM_REDIS_PORT: '6379',
-    LLM_MEM_REDIS_MODE: 'external',
-    LLM_MEM_QUEUE_REDIS_PREFIX: `claude_mem_${process.env.LLM_MEM_WORKER_PORT ?? String(37700 + ((process.getuid?.() ?? 77) % 100))}`,
     LLM_MEM_AUTH_MODE: 'api-key',
     LLM_MEM_RUNTIME: 'worker',
     LLM_MEM_OLLAMA_URL: 'http://127.0.0.1:11434',       // Ollama server base URL for vector search
     LLM_MEM_VECTOR_EMBEDDING_MODEL: 'qwen3-embedding:0.6b', // Embedding model used by hnswlib (multi-language, 1024-dim)
     LLM_MEM_DISABLE_VECTOR_SEARCH: 'false',              // 'true' to disable vector/hnsw search
-    // Phase 1a (cmem-sdk rename): canonical server settings keys. Hooks read
-    // these first; the legacy `*_BETA_*` defaults below remain so existing
-    // settings.json files still resolve correctly.
-    LLM_MEM_SERVER_URL: `http://127.0.0.1:${process.env.LLM_MEM_SERVER_PORT ?? String(37877 + ((process.getuid?.() ?? 77) % 100))}`,  // Default server runtime URL — UID-derived for multi-account isolation
-    LLM_MEM_SERVER_API_KEY: '',                          // Local hook API key, populated by installer when runtime=server
-    LLM_MEM_SERVER_PROJECT_ID: '',                       // Default Postgres project_id used by hooks when runtime=server
-    LLM_MEM_SERVER_BETA_URL: `http://127.0.0.1:${process.env.LLM_MEM_SERVER_PORT ?? String(37877 + ((process.getuid?.() ?? 77) % 100))}`,  // Legacy server-beta runtime URL — UID-derived for multi-account isolation
-    LLM_MEM_SERVER_BETA_API_KEY: '',                     // Legacy local hook API key (read as fallback when LLM_MEM_SERVER_API_KEY unset)
-    LLM_MEM_SERVER_BETA_PROJECT_ID: '',                  // Legacy Postgres project_id (read as fallback when LLM_MEM_SERVER_PROJECT_ID unset)
   };
 
   static getAllDefaults(): SettingsDefaults {

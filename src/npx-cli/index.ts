@@ -27,8 +27,6 @@ ${styleText('bold', 'Install Commands')} (no Bun required):
   ${styleText('cyan', 'npx llm-mem install --model <id>')}   Set Claude model (when provider=claude)
   ${styleText('cyan', 'npx llm-mem install --no-auto-start')}   Skip worker auto-start at the end
   ${styleText('cyan', 'npx llm-mem install --disable-auto-memory')}   Explicitly disable Claude Code native auto-memory
-  ${styleText('cyan', 'npx llm-mem install --runtime worker|server')}   Select runtime non-interactively (server brings up Docker pg+redis, generates an API key, injects the IDE MCP config)
-  ${styleText('cyan', 'npx llm-mem install --runtime server --server-url <url>')}   Point the server runtime at a specific base URL
   ${styleText('cyan', 'npx llm-mem repair')}                Repair runtime (re-runs Bun/uv setup and bun install in plugin cache)
   ${styleText('cyan', 'npx llm-mem update')}               Update to latest version
   ${styleText('cyan', 'npx llm-mem uninstall')}            Remove plugin and configs
@@ -41,10 +39,6 @@ ${styleText('bold', 'Runtime Commands')} (requires Bun, delegates to installed p
   ${styleText('cyan', 'npx llm-mem status')}               Show worker status
   ${styleText('cyan', 'npx llm-mem doctor')}               Diagnose install/runtime health (bun, uv, worker)
   ${styleText('cyan', 'npx llm-mem telemetry status|enable|disable')}   Manage anonymous telemetry (on by default, opt-out)
-  ${styleText('cyan', 'npx llm-mem server start')}         Start server service
-  ${styleText('cyan', 'npx llm-mem server stop')}          Stop server service
-  ${styleText('cyan', 'npx llm-mem server restart')}       Restart server service
-  ${styleText('cyan', 'npx llm-mem server status')}        Show server status
   ${styleText('cyan', 'npx llm-mem server api-key create|list|revoke')}   Manage API keys
   ${styleText('cyan', 'npx llm-mem worker start|stop|restart|status')}    Worker compatibility aliases
   ${styleText('cyan', 'npx llm-mem search <query>')}       Search observations
@@ -67,8 +61,6 @@ function parseInstallOptions(argv: string[]): InstallOptions {
       ide: { type: 'string' },
       provider: { type: 'string' },
       model: { type: 'string' },
-      runtime: { type: 'string' },
-      'server-url': { type: 'string' },
       'no-auto-start': { type: 'boolean' },
       'disable-auto-memory': { type: 'boolean' },
     },
@@ -82,19 +74,12 @@ function parseInstallOptions(argv: string[]): InstallOptions {
     console.error(`Unknown --provider: ${provider}. Allowed: claude, gemini, openrouter`);
     process.exit(1);
   }
-  const runtime = flag('runtime');
-  if (runtime !== undefined && runtime !== 'worker' && runtime !== 'server' && runtime !== 'server-beta') {
-    console.error(`Unknown --runtime: ${runtime}. Allowed: worker, server`);
-    process.exit(1);
-  }
   return {
     ide: flag('ide'),
     provider: provider as InstallOptions['provider'],
     model: flag('model'),
     noAutoStart: values['no-auto-start'] === true,
     disableAutoMemory: values['disable-auto-memory'] === true,
-    runtime: runtime as InstallOptions['runtime'],
-    serverUrl: flag('server-url'),
   };
 }
 
@@ -175,8 +160,10 @@ async function main(): Promise<void> {
     }
 
     case 'server': {
-      const { runServerCommand } = await import('./commands/server.js');
-      await runServerCommand(args.slice(1));
+      // The Postgres/BullMQ server runtime was removed. The only surviving
+      // 'server' subcommand is the SQLite-local API-key operability command.
+      const { runServerApiKeyCommand } = await import('./commands/runtime.js');
+      runServerApiKeyCommand(args.slice(1));
       break;
     }
 
@@ -190,9 +177,28 @@ async function main(): Promise<void> {
     }
 
     case 'worker': {
-      const { runWorkerAliasCommand } = await import('./commands/server.js');
-      runWorkerAliasCommand(args.slice(1));
-      break;
+      const sub = args[0]?.toLowerCase();
+      let aliases: Map<string, () => void>;
+      (async () => {
+        const r = await import('./commands/runtime.js');
+        aliases = new Map<string, () => void>([
+          ['start', r.runStartCommand],
+          ['stop', r.runStopCommand],
+          ['restart', r.runRestartCommand],
+          ['status', r.runStatusCommand],
+        ]);
+        const handler = aliases.get(sub ?? '');
+        if (handler) {
+          handler();
+        } else {
+          console.error(styleText('red', `Usage: npx llm-mem worker start|stop|restart|status`));
+          process.exit(1);
+        }
+      })().catch((e) => {
+        console.error(styleText('red', 'Fatal:'), (e as Error).message || e);
+        process.exit(1);
+      });
+      return;
     }
 
     case 'search': {

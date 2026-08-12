@@ -22,7 +22,6 @@ import {
   isInstallCurrent,
 } from '../install/setup-runtime.js';
 import { playBanner } from '../banner.js';
-import { normalizeRuntimeFlag } from './server-runtime-setup.js';
 import { ErrorSeverity } from '../install/error-taxonomy.js';
 import {
   createInstallSummary,
@@ -817,7 +816,7 @@ type ClaudeApiMode = 'direct' | 'gateway';
 // `'server-beta'` settings values, but the installer writes the new canonical
 // form `'server'` going forward (settings keys: LLM_MEM_SERVER_{URL,
 // API_KEY,PROJECT_ID}).
-type RuntimeId = 'worker' | 'server';
+type RuntimeId = 'worker';
 
 function readRawStoredAuthMethod(): 'subscription' | 'api-key' | 'gateway' | undefined {
   try {
@@ -839,117 +838,12 @@ function resolveClaudeAuthMethod(): 'subscription' | 'api-key' | 'gateway' {
   return 'subscription';
 }
 
-const DEFAULT_SERVER_RUNTIME_BASE_URL = 'http://127.0.0.1:37877';
-
-async function promptRuntime(options: InstallOptions): Promise<RuntimeId> {
-  // #2543 — non-interactive runtime selection via `--runtime`. When the flag is
-  // present we never prompt and never fall back to the worker path: we resolve
-  // the requested runtime deterministically and, for the server runtime, plan +
-  // execute the server-specific setup (Docker stack, key gen, IDE MCP config).
-  if (options.runtime !== undefined) {
-    const requested = normalizeRuntimeFlag(options.runtime);
-    if (requested === null) {
-      log.error(`Unknown --runtime: ${options.runtime}. Allowed: worker, server`);
-      process.exit(1);
-    }
-    if (requested === 'server') {
-      await setupServerRuntimeNonInteractive(options);
-      return 'server';
-    }
-    mergeSettings({ LLM_MEM_RUNTIME: 'worker' });
-    return 'worker';
-  }
-
-  if (!isInteractive) {
-    mergeSettings({ LLM_MEM_RUNTIME: 'worker' });
-    return 'worker';
-  }
-
-  const selected = await p.select<RuntimeId>({
-    message: 'Which runtime should llm-mem start after install?',
-    options: [
-      { value: 'worker', label: 'Worker', hint: 'stable compatibility path' },
-      { value: 'server', label: 'Server (beta)', hint: 'REST V1, API keys, team-ready storage' },
-    ],
-    initialValue: 'worker',
-  });
-
-  if (p.isCancel(selected)) {
-    p.cancel('Installation cancelled.');
-    process.exit(0);
-  }
-
-  mergeSettings({
-    LLM_MEM_RUNTIME: selected,
-  });
-
-  if (selected === 'server') {
-    await maybeBootstrapServerApiKey();
-  }
-  return selected;
-}
-
-// #2543 — set up the server runtime non-interactively. Docker stack bring-up
-// is config-only here (we log the command an operator must run / a CI
-// provisioner executes); key generation reuses the same bootstrap path as the
-// interactive flow (createServerApiKey via server-bootstrap), and the IDE MCP
-// config target is recorded in settings so hooks resolve the server runtime.
-async function setupServerRuntimeNonInteractive(options: InstallOptions): Promise<void> {
-  const serverBaseUrl = (options.serverUrl ?? '').trim() || DEFAULT_SERVER_RUNTIME_BASE_URL;
-
-  mergeSettings({ LLM_MEM_RUNTIME: 'server', LLM_MEM_SERVER_URL: serverBaseUrl });
-
-  log.info(
-    'Server runtime selected. Bring up the bundled stack with '
-      + '`docker compose up -d postgres valkey llm-mem-server llm-mem-worker` '
-      + `(pg + redis/valkey). The server listens at ${serverBaseUrl}.`,
-  );
-
-  // The server mounts its MCP endpoint at `<baseUrl>/mcp` over HTTP (vs. the
-  // worker's stdio transport); trailing slashes are trimmed so we never emit
-  // `http://host//mcp`.
-  log.info(
-    `IDE MCP config target for the server runtime: http ${serverBaseUrl.replace(/\/+$/, '')}/mcp`,
-  );
-
-  await maybeBootstrapServerApiKey();
-}
-
-async function maybeBootstrapServerApiKey(): Promise<void> {
-  // Only attempt if Postgres is configured. Without DATABASE_URL we cannot
-  // reach the api_keys table — the operator must configure the server first
-  // and rerun `llm-mem server keys rotate`.
-  if (!process.env.LLM_MEM_SERVER_DATABASE_URL) {
-    log.warn(
-      'Skipping local hook API key bootstrap: LLM_MEM_SERVER_DATABASE_URL is not set. '
-        + 'Run `npx llm-mem server keys rotate` after configuring Postgres to provision a key.',
-    );
-    return;
-  }
-  try {
-    await bootstrapAndPersistServerApiKey();
-  } catch (error: unknown) {
-    // [ANTI-PATTERN IGNORED]: the failure is already surfaced to the user via the interactive-aware log.warn wrapper below (p.log.warn in a TTY, console.warn otherwise), including the manual remediation command.
-    log.warn(
-      `Failed to bootstrap server API key: ${error instanceof Error ? error.message : String(error)}. `
-        + 'Hooks will fall back to the worker until you run `npx llm-mem server keys rotate`.',
-    );
-  }
-}
-
-async function bootstrapAndPersistServerApiKey(): Promise<void> {
-  const { bootstrapServerApiKey, persistServerSettings } = await import(
-    '../../services/hooks/server-bootstrap.js'
-  );
-  const result = await bootstrapServerApiKey();
-  persistServerSettings(USER_SETTINGS_PATH, {
-    apiKey: result.rawKey,
-    projectId: result.projectId,
-  });
-  log.info(
-    `Provisioned local hook API key (project=${result.projectId.slice(0, 8)}…). `
-      + 'Settings saved with mode 0600.',
-  );
+// The Postgres/BullMQ server runtime has been removed. The worker is now the
+// only runtime, so runtime selection is a no-op — we simply ensure the stored
+// setting reflects 'worker' so callers that still read it stay consistent.
+async function promptRuntime(_options: InstallOptions): Promise<RuntimeId> {
+  mergeSettings({ LLM_MEM_RUNTIME: 'worker' });
+  return 'worker';
 }
 
 async function promptProvider(options: InstallOptions): Promise<ProviderId> {
@@ -1439,11 +1333,6 @@ export interface InstallOptions {
   model?: string;
   noAutoStart?: boolean;
   disableAutoMemory?: boolean;
-  // #2543 — non-interactive runtime selection. `server` is the operator-facing
-  // alias for the canonical `server-beta` runtime id.
-  runtime?: 'worker' | 'server' | 'server-beta';
-  // Base URL the server runtime (and the injected IDE MCP config) targets.
-  serverUrl?: string;
 }
 
 export async function runInstallCommand(options: InstallOptions = {}): Promise<void> {
@@ -1713,19 +1602,12 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
     log.info('Claude Code: leaving native auto-memory enabled unless you explicitly opt in to disabling it.');
   }
 
-  // The server runtime is brought up via its own stack (Docker pg+redis +
-  // `llm-mem server start`), NOT the worker-service spawner. Skip the
-  // worker-only autostart entirely so the server runtime never invokes the
-  // worker path (#2543).
-  const autoStartSkipped = !isInteractive || options.noAutoStart || selectedRuntime === 'server';
+  const autoStartSkipped = !isInteractive || options.noAutoStart;
 
   await runTasks([
     {
-      title: selectedRuntime === 'server' ? 'Starting server daemon' : 'Starting worker daemon',
+      title: 'Starting worker daemon',
       task: async (message) => {
-        if (selectedRuntime === 'server') {
-          return `Server runtime selected — start it with ${styleText('bold', 'npx llm-mem server start')} ${styleText('dim', '(or via Docker compose)')}`;
-        }
         if (autoStartSkipped) {
           return isInteractive
             ? `Skipped (--no-auto-start)`
@@ -1735,8 +1617,6 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
         const marketplaceScriptPath = join(marketplaceDirectory(), 'plugin', 'scripts', 'worker-service.cjs');
         const cacheScriptPath = join(pluginCacheDirectory(version), 'scripts', 'worker-service.cjs');
         const scriptPath = existsSync(marketplaceScriptPath) ? marketplaceScriptPath : cacheScriptPath;
-        // selectedRuntime is narrowed to 'worker' here: the server case
-        // returned above and never reaches the worker-service spawner.
         message(`Spawning worker on port ${port}...`);
         workerStartResult = await ensureWorkerStarted(port, scriptPath);
         switch (workerStartResult) {
@@ -1826,15 +1706,13 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
 
   const finalWorkerState = workerStartResult as WorkerStartResult;
   const workerAlive = finalWorkerState !== 'dead' || workerReady;
-  const runtimeLabel = selectedRuntime === 'server' ? 'Server' : 'Worker';
-  const runtimeStartCommand = selectedRuntime === 'server' ? 'npx llm-mem server start' : 'npx llm-mem start';
   const workerBaseUrl = `http://${workerUrlHost}:${actualPort}`;
   const configuredWorkerBaseUrl = `http://${workerUrlHost}:${workerPort}`;
   const workerHeadline = autoStartSkipped
-    ? `${styleText('yellow', '!')} ${runtimeLabel} autostart skipped — start it manually with ${styleText('bold', runtimeStartCommand)}`
+    ? `${styleText('yellow', '!')} Worker autostart skipped — start it manually with ${styleText('bold', 'npx llm-mem start')}`
     : workerReady || finalWorkerState === 'ready'
-      ? `${styleText('green', '✓')} ${runtimeLabel} running at ${styleText('underline', workerBaseUrl)}`
-      : `${styleText('yellow', '⏳')} ${runtimeLabel} starting at ${styleText('underline', workerBaseUrl)} — give it ~30s, then refresh`;
+      ? `${styleText('green', '✓')} Worker running at ${styleText('underline', workerBaseUrl)}`
+      : `${styleText('yellow', '⏳')} Worker starting at ${styleText('underline', workerBaseUrl)} — give it ~30s, then refresh`;
   const nextStepsHeadline = autoStartSkipped || workerAlive
     ? workerHeadline
     : `${styleText('yellow', '!')} Worker not yet ready on port ${styleText('cyan', String(workerPort))} -- still starting up; check ${styleText('bold', 'llm-mem status')} later, or start manually: ${styleText('bold', 'npx llm-mem start')}`;

@@ -201,26 +201,15 @@ export const sessionInitHandler: EventHandler = {
 };
 
 async function startServerSession(
-  runtime: ServerRuntimeContext,
-  input: NormalizedHookInput,
-  sessionId: string,
-  platformSource: string,
-  project: string,
-  prompt: string,
+  _runtime: ServerRuntimeContext,
+  _input: NormalizedHookInput,
+  _sessionId: string,
+  _platformSource: string,
+  _project: string,
+  _prompt: string,
 ): Promise<void> {
-  await runtime.client.startSession({
-    projectId: runtime.projectId,
-    externalSessionId: sessionId,
-    contentSessionId: sessionId,
-    agentId: input.agentId ?? null,
-    agentType: input.agentType ?? null,
-    platformSource,
-    metadata: { project, prompt },
-  });
-  logger.info('HOOK', 'session-init: server session started', {
-    contentSessionId: sessionId,
-    project,
-  });
+  // Server mode removed; this dead path should never be reached now.
+  logger.warn('HOOK', 'startServerSession called in post-server-mode build (unreachable)');
 }
 
 function parseSemanticInjectLimit(value: string | number): number {

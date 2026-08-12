@@ -30,18 +30,6 @@ function workerServiceScriptPath(): string {
   return join(marketplaceDirectory(), 'plugin', 'scripts', 'worker-service.cjs');
 }
 
-function serverServiceScriptPath(): string {
-  // Plan §1c line 149: prefer the renamed `server-service.cjs`, but fall
-  // back to the legacy `server-beta-service.cjs` for installed plugin
-  // caches that pre-date the rename (forced reinstall not required).
-  const scriptsDir = join(marketplaceDirectory(), 'plugin', 'scripts');
-  const renamed = join(scriptsDir, 'server-service.cjs');
-  if (existsSync(renamed)) {
-    return renamed;
-  }
-  return join(scriptsDir, 'server-beta-service.cjs');
-}
-
 /**
  * Spawn a plugin .cjs script under Bun with inherited stdio, exiting this
  * process with the child's exit code. `args[0]` is the script path. Sanitizes
@@ -77,43 +65,6 @@ function spawnBunWorkerCommand(command: string, extraArgs: string[] = []): void 
   }
 
   spawnPlugin(bunPath, [workerScript, command, ...extraArgs]);
-}
-
-function spawnBunServerCommand(command: string, extraArgs: string[] = []): void {
-  ensureInstalledOrExit();
-  const bunPath = resolveBunOrExit();
-  const serverScript = serverServiceScriptPath();
-
-  if (!existsSync(serverScript)) {
-    console.error(styleText('red', `Server script not found at: ${serverScript}`));
-    console.error('The installation may be corrupted. Try: npx llm-mem install');
-    process.exit(1);
-  }
-
-  spawnPlugin(bunPath, [serverScript, command, ...extraArgs]);
-}
-
-export function runServerStartCommand(): void {
-  spawnBunServerCommand('start');
-}
-
-export function runServerStopCommand(): void {
-  spawnBunServerCommand('stop');
-}
-
-export function runServerRestartCommand(): void {
-  spawnBunServerCommand('restart');
-}
-
-export function runServerStatusCommand(): void {
-  spawnBunServerCommand('status');
-}
-
-// Phase 10 — start the BullMQ generation worker (no HTTP). Use this in
-// Compose to scale generation horizontally while a single (or multiple)
-// HTTP-only server replicas serve writes/reads.
-export function runServerWorkerStartCommand(): void {
-  spawnBunServerCommand('worker', ['start']);
 }
 
 export function runStartCommand(): void {

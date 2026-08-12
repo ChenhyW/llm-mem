@@ -1,7 +1,6 @@
 
 import path from 'path';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
-import { spawn } from 'child_process';
 import { pathToFileURL } from 'url';
 import type { Database } from 'bun:sqlite';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -903,11 +902,10 @@ export function parseWorkerServiceCommand(argv: string[]): ParsedWorkerCommand {
   const [rawCommand, maybeSubCommand, ...rest] = argv;
 
   if (rawCommand === 'server') {
-    const lifecycleCommands = new Set(['start', 'stop', 'restart', 'status']);
-    if (maybeSubCommand && lifecycleCommands.has(maybeSubCommand)) {
-      return { command: `server-${maybeSubCommand}`, args: rest };
-    }
-    const serverCommands = new Set(['api-key', 'keys', 'jobs']);
+    // The only remaining 'server' subcommand is the SQLite-local api-key
+    // operability command. Everything else (start/stop/restart/status,
+    // keys, jobs) belonged to the removed Postgres/BullMQ server runtime.
+    const serverCommands = new Set(['api-key']);
     return {
       command: maybeSubCommand && serverCommands.has(maybeSubCommand) ? `server-${maybeSubCommand}` : 'server-help',
       args: rest,
@@ -928,50 +926,9 @@ export function parseWorkerServiceCommand(argv: string[]): ParsedWorkerCommand {
   };
 }
 
-function printServerCommandHelp(): never {
-  console.error('Usage: worker-service server <command>');
-  console.error('Commands: start, stop, restart, status, api-key create|list|revoke');
-  process.exit(1);
-}
-
 function printWorkerAliasHelp(): never {
   console.error('Usage: worker-service worker start|stop|restart|status');
   process.exit(1);
-}
-
-function runServerServiceCli(command: string, extraArgs: string[] = []): void {
-  // Plan §1c line 149: try the post-rename script first, then fall back
-  // to the legacy `server-beta-service.cjs` so users running against an
-  // already-installed plugin cache (built before the rename) continue to
-  // dispatch without a forced reinstall.
-  let serverScript = path.join(__dirname, 'server-service.cjs');
-  if (!existsSync(serverScript)) {
-    const legacyScript = path.join(__dirname, 'server-beta-service.cjs');
-    if (existsSync(legacyScript)) {
-      serverScript = legacyScript;
-    } else {
-      console.error(`Server script not found at: ${serverScript}`);
-      console.error('Rebuild or reinstall llm-mem so server-service.cjs is available.');
-      process.exit(1);
-    }
-  }
-
-  const child = spawn(process.execPath, [serverScript, command, ...extraArgs], {
-    stdio: 'inherit',
-    windowsHide: true,
-    // Strip host CLI bleed-through (CLAUDE_CODE_*, including EFFORT_LEVEL) and
-    // Anthropic credentials before handing env to the spawned daemon. The
-    // daemon re-reads its own credentials from ~/.llm-mem/.env. See
-    // env-isolation discipline (#2357 / #2375).
-    env: sanitizeEnv(process.env),
-  });
-  child.on('error', (error) => {
-    console.error(`Failed to start server command: ${error.message}`);
-    process.exit(1);
-  });
-  child.on('close', (exitCode) => {
-    process.exit(exitCode ?? 0);
-  });
 }
 
 function parseServerApiKeyOptions(args: string[]): Record<string, string> {
@@ -1265,7 +1222,6 @@ async function main() {
         if (dependencyHint) {
           console.log(dependencyHint);
         }
-        printQueueStatusIfBullMq(health);
         process.exit(0);
       }
       if (await isPortInUse(port)) {
@@ -1277,14 +1233,6 @@ async function main() {
       }
       console.log('Worker is not running');
       process.exit(0);
-      break;
-    }
-
-    case 'server-start':
-    case 'server-stop':
-    case 'server-restart':
-    case 'server-status': {
-      runServerServiceCli(command.slice('server-'.length));
       break;
     }
 
@@ -1303,21 +1251,15 @@ async function main() {
       break;
     }
 
-    // #2572 — `keys`/`jobs` are server (Postgres) operability commands.
-    // Delegate to the server script so they read the Postgres backend the
-    // server runtime actually uses, instead of the SQLite worker store.
-    case 'server-keys': {
-      runServerServiceCli('server', ['keys', ...commandArgs]);
-      break;
-    }
-
-    case 'server-jobs': {
-      runServerServiceCli('server', ['jobs', ...commandArgs]);
-      break;
-    }
-
+    // The Postgres/BullMQ server runtime was removed; its operability
+    // commands (keys, jobs, help) no longer have a script to delegate to.
+    // Only 'server api-key' remains, which runs against the SQLite store.
+    case 'server-keys':
+    case 'server-jobs':
     case 'server-help': {
-      printServerCommandHelp();
+      console.error(`The '${command}' command is no longer available (server mode was removed).`);
+      console.error('Remaining server command: worker-service server api-key create|list|revoke|migrate-scopes');
+      process.exit(1);
       break;
     }
 
@@ -1565,27 +1507,6 @@ async function fetchWorkerHealth(port: number, timeoutMs: number): Promise<Worke
     // [ANTI-PATTERN IGNORED]: health probe — connection refused/timeout IS the "worker not running" answer, polled on every status check; logging would spam. null is the documented recovery value the callers branch on.
     return null;
   }
-}
-
-/**
- * Print BullMQ queue detail from an already-fetched /api/health snapshot.
- * A degraded worker answers 503 but still includes the queue block, and
- * `status` already treats that worker as running — so this must not
- * re-fetch and bail on a non-2xx response (which hid the queue detail
- * behind "BullMQ health unavailable (HTTP 503)"). Reusing the snapshot in
- * hand keeps the output consistent with what `status` just reported.
- */
-function printQueueStatusIfBullMq(health: WorkerHealthSnapshot): void {
-  if (SettingsDefaultsManager.get('LLM_MEM_QUEUE_ENGINE').trim().toLowerCase() !== 'bullmq') {
-    return;
-  }
-  const redis = health.queue?.redis;
-  if (!redis) {
-    return;
-  }
-  const target = `${redis.host ?? 'unknown'}:${redis.port ?? 'unknown'}`;
-  const suffix = redis.status === 'ok' ? '' : ` (${redis.error ?? 'unhealthy'})`;
-  console.log(`  Queue: BullMQ Redis ${redis.status ?? 'unknown'} at ${target} [${redis.mode ?? 'external'}, prefix=${redis.prefix ?? 'claude_mem'}]${suffix}`);
 }
 
 const isMainModule = typeof require !== 'undefined' && typeof module !== 'undefined'
