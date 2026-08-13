@@ -675,7 +675,7 @@ export class ChromaMcpManager {
       }
 
       const unavailableMessage = `chroma-mcp prewarm failed: ${errorMessage}`;
-      recordUvxVectorSearchUnavailable(unavailableMessage);
+      recordChromaVectorSearchUnavailable(unavailableMessage);
       throw new ChromaUnavailableError(unavailableMessage, error instanceof Error ? error : undefined);
     } finally {
       if (timeoutId) {

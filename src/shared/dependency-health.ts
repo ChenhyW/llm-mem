@@ -3,7 +3,7 @@ export type DependencyStatusKind =
   | 'vector_search_unavailable'
   | 'vector_helper_unavailable';
 
-export type DependencyName = 'claude_cli' | 'hnsw_helper';
+export type DependencyName = 'claude_cli' | 'hnsw_helper' | 'uvx' | 'chroma';
 
 export interface DependencyStatus {
   dependency: DependencyName;

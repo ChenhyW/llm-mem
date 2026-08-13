@@ -41,7 +41,7 @@ export function runMetadataObservationsMigration(
   return { created };
 }
 
-function backfillObservations(db: sqlite3.DatabaseSync) {
+function backfillObservations(db: any) {
   db.exec(`
     INSERT OR REPLACE INTO metadata_observations
       (sqlite_id, doc_type, field_type, document, project, platform_source, created_at_epoch)
@@ -63,7 +63,7 @@ function backfillObservations(db: sqlite3.DatabaseSync) {
   `);
 }
 
-function backfillSummaries(db: sqlite3.DatabaseSync) {
+function backfillSummaries(db: any) {
   db.exec(`
     INSERT OR REPLACE INTO metadata_observations
       (sqlite_id, doc_type, field_type, document, project, platform_source, created_at_epoch)
@@ -72,7 +72,7 @@ function backfillSummaries(db: sqlite3.DatabaseSync) {
       'session_summary',
       'session_summary',
       COALESCE(
-        s.requested_action ||
+        s.request ||
         CASE WHEN s.investigated THEN ' ' || s.investigated ELSE '' END ||
         CASE WHEN s.learned THEN ' ' || s.learned ELSE '' END ||
         CASE WHEN s.completed THEN ' ' || s.completed ELSE '' END ||
@@ -88,7 +88,7 @@ function backfillSummaries(db: sqlite3.DatabaseSync) {
   `);
 }
 
-function backfillPrompts(db: sqlite3.DatabaseSync) {
+function backfillPrompts(db: any) {
   db.exec(`
     INSERT OR REPLACE INTO metadata_observations
       (sqlite_id, doc_type, field_type, document, project, platform_source, created_at_epoch)

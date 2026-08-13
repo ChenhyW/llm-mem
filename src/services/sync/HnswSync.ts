@@ -139,13 +139,14 @@ export class HnswSync {
     memorySessionId: string,
     project: string,
     summary: {
-      requested_action: string;
-      investigated: string;
-      learned: string;
-      completed: string;
-      next_steps: string;
-      notes: string;
+      request: string | null;
+      investigated: string | null;
+      learned: string | null;
+      completed: string | null;
+      next_steps: string | null;
+      notes: string | null;
     },
+    promptNumber: number,
     createdAtEpoch: number,
     platformSource?: string
   ): Promise<void> {
@@ -166,8 +167,8 @@ export class HnswSync {
     memorySessionId: string,
     project: string,
     promptText: string,
+    promptNumber: number,
     createdAtEpoch: number,
-    promptNumber?: number,
     platformSource?: string
   ): Promise<void> {
     const row = {
@@ -238,11 +239,11 @@ export class HnswSync {
   }
 
   private buildSummaryText(
-    summary: { requested_action: string; investigated: string; learned: string; completed: string; next_steps: string; notes: string },
+    summary: { request: string | null; investigated: string | null; learned: string | null; completed: string | null; next_steps: string | null; notes: string | null },
     _session: string
   ): string {
     const parts: string[] = [];
-    if (summary.requested_action) parts.push(summary.requested_action);
+    if (summary.request) parts.push(summary.request);
     if (summary.investigated) parts.push(summary.investigated);
     if (summary.learned) parts.push(summary.learned);
     if (summary.completed) parts.push(summary.completed);
