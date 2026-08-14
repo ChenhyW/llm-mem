@@ -275,6 +275,8 @@ export class SettingsRoutes extends BaseRouteHandler {
       'LLM_MEM_TELEGRAM_ENABLED',
       'LLM_MEM_TELEGRAM_BOT_TOKEN',
       'LLM_MEM_TELEGRAM_CHAT_ID',
+      'LLM_MEM_OBS_BATCH_SIZE',
+      'LLM_MEM_OBS_BATCH_TIMEOUT_MS',
     ];
 
     for (const key of settingKeys) {
@@ -424,6 +426,20 @@ export class SettingsRoutes extends BaseRouteHandler {
     if (settings.LLM_MEM_DISABLE_VECTOR_SEARCH) {
       if (!['true', 'false'].includes(settings.LLM_MEM_DISABLE_VECTOR_SEARCH)) {
         return { valid: false, error: 'LLM_MEM_DISABLE_VECTOR_SEARCH 必须为 "true" 或 "false"' };
+      }
+    }
+
+    if (settings.LLM_MEM_OBS_BATCH_SIZE) {
+      const batchSize = parseInt(settings.LLM_MEM_OBS_BATCH_SIZE, 10);
+      if (isNaN(batchSize) || batchSize < 1) {
+        return { valid: false, error: 'LLM_MEM_OBS_BATCH_SIZE must be an integer >= 1' };
+      }
+    }
+
+    if (settings.LLM_MEM_OBS_BATCH_TIMEOUT_MS) {
+      const timeout = parseInt(settings.LLM_MEM_OBS_BATCH_TIMEOUT_MS, 10);
+      if (isNaN(timeout) || timeout < 0) {
+        return { valid: false, error: 'LLM_MEM_OBS_BATCH_TIMEOUT_MS must be an integer >= 0' };
       }
     }
 
