@@ -75,6 +75,7 @@ export function App() {
     isRestarting,
     restartStatus,
     dependencyHealth,
+    isDependencyLoading,
   } = useSettings();
   const { preference, setThemePreference } = useTheme();
   const pagination = usePagination(currentFilter);
@@ -206,6 +207,7 @@ export function App() {
         isRestarting={isRestarting}
         restartStatus={restartStatus}
         dependencyHealth={dependencyHealth}
+        isDependencyLoading={isDependencyLoading}
       />
 
       <button

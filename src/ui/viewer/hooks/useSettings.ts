@@ -10,20 +10,35 @@ export function useSettings() {
   const [isRestarting, setIsRestarting] = useState(false);
   const [restartStatus, setRestartStatus] = useState('');
   const [dependencyHealth, setDependencyHealth] = useState<DependencyStatus[]>([]);
+  const [isDependencyLoading, setIsDependencyLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetch(API_ENDPOINTS.SETTINGS).then(r => {
-        if (!r.ok) throw new Error(`Failed to load settings (${r.status})`);
-        return r.json();
-      }),
-      fetch(API_ENDPOINTS.DEPENDENCY_HEALTH).then(r => r.ok ? r.json() : []).catch(() => [])
-    ]).then(([settingsData, dep]) => {
-      setSettings({ ...DEFAULT_SETTINGS, ...settingsData });
-      if (Array.isArray(dep)) setDependencyHealth(dep);
-    }).catch(() => {
-      // offline / worker not started — keep defaults
-    });
+    const load = async () => {
+      setIsDependencyLoading(true);
+      try {
+        const [settingsData, dep] = await Promise.all([
+          fetch(API_ENDPOINTS.SETTINGS).then(r => {
+            if (!r.ok) throw new Error(`Failed to load settings (${r.status})`);
+            return r.json();
+          }),
+          fetch(API_ENDPOINTS.DEPENDENCY_HEALTH)
+            .then(async r => {
+              if (!r.ok) return [];
+              const data = await r.json();
+              // Endpoint returns {degraded, statuses:[...]} object.
+              return Array.isArray(data) ? data : (data?.statuses || []);
+            })
+            .catch(() => [])
+        ]);
+        setSettings({ ...DEFAULT_SETTINGS, ...settingsData });
+        if (Array.isArray(dep)) setDependencyHealth(dep);
+      } catch {
+        // offline / worker not started — keep defaults
+      } finally {
+        setIsDependencyLoading(false);
+      }
+    };
+    load();
   }, []);
 
   const submitSettings = async (newSettings: Settings) => {
@@ -86,5 +101,6 @@ export function useSettings() {
     isRestarting,
     restartStatus,
     dependencyHealth,
+    isDependencyLoading,
   };
 }

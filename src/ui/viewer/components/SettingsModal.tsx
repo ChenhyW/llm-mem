@@ -13,6 +13,7 @@ export interface SettingsModalProps {
   isRestarting: boolean;
   restartStatus: string;
   dependencyHealth: DependencyStatus[];
+  isDependencyLoading: boolean;
 }
 
 type TabKey = 'basic' | 'model' | 'embed' | 'context' | 'diagnosis' | 'mcp';
@@ -174,6 +175,7 @@ export function SettingsModal({
   isRestarting,
   restartStatus,
   dependencyHealth,
+  isDependencyLoading,
 }: SettingsModalProps) {
   const [draft, setDraft] = useState<Settings>(settings);
   const [activeTab, setActiveTab] = useState<TabKey>('basic');
@@ -520,11 +522,15 @@ export function SettingsModal({
       case 'diagnosis':
         return (
           <CollapsibleSection title="依赖健康状态">
-            {dependencyHealth.length === 0 && (
+            {isDependencyLoading ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
-                暂无诊断信息（Worker 可能未启动）
+                正在获取诊断信息...
               </p>
-            )}
+            ) : dependencyHealth.length === 0 ? (
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13 }}>
+                一切正常，未发现依赖问题。
+              </p>
+            ) : null}
             {dependencyHealth.map((d, i) => {
               const color = d.kind === 'ok' ? '#22c55e' : d.kind === 'setup_required' ? '#f59e0b' : '#ef4444';
               return (
