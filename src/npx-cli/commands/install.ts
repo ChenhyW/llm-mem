@@ -16,8 +16,10 @@ import { ensureWorkerStarted, type WorkerStartResult } from '../../services/work
 import { formatHostForUrl } from '../../shared/worker-utils.js';
 import {
   ensureBun,
+  ensureHnswlibPythonDeps,
   ensureUv,
   installPluginDependencies,
+  userHasOptedOutOfVectorSearch,
   writeInstallMarker,
   isInstallCurrent,
 } from '../install/setup-runtime.js';
@@ -34,6 +36,23 @@ import { extractEresolveBlock, isEresolve, runNpmStrict } from '../install/npm-i
 
 function getSetting<K extends keyof SettingsDefaults>(key: K): SettingsDefaults[K] {
   return SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH)[key];
+}
+
+async function setupVectorPythonDepsIfNeeded(message: (msg: string) => void, summary?: InstallSummary): Promise<string | undefined> {
+  if (userHasOptedOutOfVectorSearch()) return undefined;
+  message('Checking vector-search Python deps (hnswlib/numpy)…');
+  const result = await ensureHnswlibPythonDeps(summary, { allowVectorSearchOptOut: false });
+  const parts: string[] = [];
+  if ('pythonVersion' in result && result.pythonVersion) {
+    parts.push(`Python ${result.pythonVersion}`);
+  }
+  if ('hnswlibVersion' in result && result.hnswlibVersion) {
+    parts.push(`hnswlib ${result.hnswlibVersion}`);
+  }
+  if ('numpyVersion' in result && result.numpyVersion) {
+    parts.push(`numpy ${result.numpyVersion}`);
+  }
+  return parts.length > 0 ? parts.join(', ') : 'hnswlib/numpy ready';
 }
 
 const isInteractive = process.stdin.isTTY === true;
@@ -1512,6 +1531,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
           const { version: bunVersion } = await ensureBun(summary);
           message('Checking uv…');
           const { version: uvVersion } = await ensureUv(summary);
+          const vectorDepsSummary = await setupVectorPythonDepsIfNeeded(message, summary);
           installedBunVersion = bunVersion;
           installedUvVersion = uvVersion;
           const cacheDir = pluginCacheDirectory(version);
@@ -1526,7 +1546,7 @@ async function runInstallCommandInner(options: InstallOptions, summary: InstallS
             writeInstallMarker(cacheDir, version, bunVersion, uvVersion);
           }
           writeInstallMarker(join(marketplaceDirectory(), 'plugin'), version, bunVersion, uvVersion);
-          return `Runtime ready (Bun ${bunVersion}, uv ${uvVersion}) ${styleText('green', 'OK')}`;
+          return `Runtime ready (Bun ${bunVersion}, uv ${uvVersion}${vectorDepsSummary ? `, ${vectorDepsSummary}` : ''}) ${styleText('green', 'OK')}`;
         },
       },
     ];
@@ -1800,6 +1820,7 @@ async function runRepairCommandInner(summary: InstallSummary): Promise<void> {
         message('Checking uv…');
         const uv = await ensureUv(summary);
         uvVersion = uv.version;
+        const vectorDepsSummary = await setupVectorPythonDepsIfNeeded(message, summary);
         // Repair must regenerate the cache if it was wiped (e.g. user ran
         // `rm -rf ~/.claude/plugins/cache`). Without this, bun install would
         // fail immediately with no package.json to install against.

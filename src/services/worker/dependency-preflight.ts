@@ -1,7 +1,10 @@
 import { spawn } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { sanitizeEnv } from '../../supervisor/env-sanitizer.js';
 import { findClaudeExecutable as defaultFindClaudeExecutable } from '../../shared/find-claude-executable.js';
 import { logger } from '../../utils/logger.js';
+import { DATA_DIR } from '../../shared/paths.js';
 import {
   clearDependencyStatus,
   recordClaudeCliSetupRequired,
@@ -38,7 +41,7 @@ export interface WorkerDependencyPreflightOptions {
  */
 async function hnswHelperIsAvailable(
   options: WorkerDependencyPreflightOptions,
-): Promise<boolean> {
+): Promise<{ available: boolean; reason?: string }> {
   const platform = options.platform ?? process.platform;
   const pythonBin =
     options.pythonBin ?? (platform === 'win32' ? 'python.exe' : 'python3');
@@ -58,20 +61,74 @@ async function hnswHelperIsAvailable(
       timeout: 15000,
     });
     let out = '';
+    let err = '';
     child.stdout.on('data', (chunk: Buffer | string) => {
       out += chunk.toString();
     });
-    child.on('exit', (code) => {
+    child.stderr.on('data', (chunk: Buffer | string) => {
+      err += chunk.toString();
+    });
+    const extractReason = (stderr: string): string => {
+      // Take the last non-empty stderr line; it usually carries the actual
+      // exception message (e.g. "ModuleNotFoundError: No module named 'hnswlib'",
+      // "Connection refused / unable to connect to Ollama", etc.).
+      const lines = stderr
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .filter((l) => !/^\d+$/.test(l));
+      if (lines.length === 0) {
+        return '';
+      }
+      return lines[lines.length - 1];
+    };
+    child.on('exit', (code, signal) => {
       if (code === 0 && out.trim().toLowerCase().startsWith('ok')) {
-        resolve(true);
+        resolve({ available: true });
       } else {
-        resolve(false);
+        const stderr = err.trim();
+        const reason = stderr ? extractReason(stderr) : undefined;
+        resolve({
+          available: false,
+          reason: reason
+            ? `${pythonBin} -c "import hnswlib, numpy" failed: ${reason}`
+            : undefined,
+        });
+        if (signal) {
+          logger.warn('WORKER', 'HNSW helper probe terminated by signal', {
+            signal,
+          });
+        }
       }
     });
-    child.on('error', () => {
-      resolve(false);
+    child.on('error', (error: Error) => {
+      resolve({
+        available: false,
+        reason: `Failed to spawn ${pythonBin}: ${error.message}`,
+      });
     });
   });
+}
+
+/**
+ * Read the global helper-unavailable status file the Python helper writes when
+ * it can't even load its own imports (top-level import failure). Returns a
+ * short human reason, or undefined if the helper is healthy / no marker exists.
+ */
+function readHnswHelperGlobalFailure(): string | undefined {
+  const statusPath = join(DATA_DIR, 'hnswlib', 'hnswlib-helper-unavailable.json');
+  if (!existsSync(statusPath)) {
+    return undefined;
+  }
+  try {
+    const payload = JSON.parse(readFileSync(statusPath, 'utf-8')) as {
+      reason?: string;
+      stderr_tail?: string;
+    };
+    return payload.reason || payload.stderr_tail || 'helper unavailable';
+  } catch {
+    return undefined;
+  }
 }
 
 export async function runWorkerDependencyPreflight(
@@ -105,16 +162,30 @@ export async function runWorkerDependencyPreflight(
   const vectorSearchEnabled =
     options.settings.LLM_MEM_CHROMA_ENABLED !== 'false';
   if (vectorSearchEnabled) {
-    const available = await hnswHelperIsAvailable(options);
-    if (available) {
+    const result = await hnswHelperIsAvailable(options);
+    if (result.available) {
       clearDependencyStatus('hnsw_helper');
     } else {
       const pythonBin =
         options.pythonBin ??
         (options.platform === 'win32' ? 'python.exe' : 'python3');
+      // The helper writes a global status file when it can't even load its
+      // own imports (top-level import failure) — an all-or-nothing failure
+      // affecting every record, not just one sqlite_id. Surface it explicitly
+      // so the diagnostics tab says "index build cannot run" rather than the
+      // misleading "未向量化" badge on every record.
+      const globalFail = readHnswHelperGlobalFailure();
+      const buildBlocker = globalFail
+        ? ` ⚠️ index build cannot run: ${globalFail}`
+        : '';
+      const reasonPart = result.reason
+        ? ` ${result.reason}.`
+        : ` ${pythonBin} -c "import hnswlib, numpy" failed.`;
       recordHnswVectorSearchUnavailable(
-        `HNSW vector-search helper not available via ${pythonBin}; python3 -c "import hnswlib, numpy" failed. ` +
-          'Install the packages and restart llm-mem.',
+        `HNSW vector-search helper not available via ${pythonBin};` +
+          reasonPart +
+          buildBlocker +
+          ' Install the packages and restart llm-mem.',
       );
     }
   } else {

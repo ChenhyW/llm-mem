@@ -2,6 +2,9 @@ import { spawnHnswHelper, getHnswDir } from './hnswlib-spawn.js';
 import { logger } from '../../utils/logger.js';
 import { DB_PATH, USER_SETTINGS_PATH } from '../../shared/paths.js';
 import { SettingsDefaultsManager } from '../../shared/SettingsDefaultsManager.js';
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export type ChromaDocType = 'observation' | 'session_summary' | 'user_prompt';
 
@@ -280,8 +283,15 @@ export class HnswSync {
         ],
         env,
       );
+      const sqliteId = Number(row.sqlite_id || 0);
       if (r.exitCode !== 0) {
+        const reason = r.stderr?.trim()
+          ? r.stderr.trim().split('\n').pop() ?? 'helper failed'
+          : 'helper failed';
         logger.warn('HNSW_SYNC', 'sync row failed', { stderr: r.stderr });
+        if (sqliteId > 0) {
+          this.recordVectorError(sqliteId, reason);
+        }
         return;
       }
       try {
@@ -292,12 +302,69 @@ export class HnswSync {
             id: result.id,
             reason: result.vector_error,
           });
+          this.recordVectorError(sqliteId, String(result.vector_error));
+        } else if (sqliteId > 0) {
+          // Sync succeeded and vectorized ok — clear any stale error for this id.
+          this.clearVectorError(sqliteId);
         }
       } catch (_) {
-        // JSON parse of stdout not essential; log is enough
+        // stdout is not valid JSON despite a 0 exit — record so the UI can show
+        // the failure reason instead of the generic "未向量化" badge.
+        logger.warn('HNSW_SYNC', 'sync row returned no JSON', {});
+        if (sqliteId > 0) {
+          this.recordVectorError(sqliteId, 'helper returned no result');
+        }
       }
     } catch (err) {
       logger.warn('HNSW_SYNC', 'sync row threw', {}, err instanceof Error ? err : new Error(String(err)));
+      if (Number(row.sqlite_id || 0) > 0) {
+        this.recordVectorError(Number(row.sqlite_id), err instanceof Error ? err.message : String(err));
+      }
+    }
+  }
+
+  /**
+   * Persist a per-record vectorization failure into hnsw_dir/vector-errors.json
+   * so the viewer can display the concrete reason instead of a generic
+   * "未向量化" badge.  This covers the py-helper-crashed path (exitCode!==0 or
+   * non-JSON stdout) where the helper never gets to call its own
+   * record_vector_error().  Atomic rename so multiple workers can append
+   * concurrently without corrupting the file.
+   */
+  private recordVectorError(sqliteId: number, reason: string): void {
+    this.mutateVectorErrorsMap((map) => {
+      const truncated = reason.length > 240 ? reason.slice(0, 240) : reason;
+      map[String(sqliteId)] = truncated;
+    });
+  }
+
+  private clearVectorError(sqliteId: number): void {
+    this.mutateVectorErrorsMap((map) => {
+      delete map[String(sqliteId)];
+    });
+  }
+
+  private mutateVectorErrorsMap(mutate: (map: Record<string, string>) => void): void {
+    try {
+      const mapPath = path.join(this.hnswDir, 'vector-errors.json');
+      const tmpPath = mapPath + '.tmp';
+      let map: Record<string, string> = {};
+      if (fs.existsSync(mapPath)) {
+        try {
+          map = JSON.parse(fs.readFileSync(mapPath, 'utf8')) as Record<string, string>;
+        } catch {
+          map = {};
+        }
+      }
+      if (!Array.isArray(map) && typeof map === 'object' && map !== null) {
+        mutate(map);
+      }
+      fs.writeFileSync(tmpPath, JSON.stringify(map, null, 2));
+      fs.renameSync(tmpPath, mapPath);
+    } catch (err) {
+      // Never let error tracking derail sync.
+      logger.debug('HNSW_SYNC', 'vector-errors.json update failed (non-blocking)', {},
+        err instanceof Error ? err : new Error(String(err)));
     }
   }
 }

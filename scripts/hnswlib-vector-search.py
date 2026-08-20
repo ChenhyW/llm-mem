@@ -36,6 +36,43 @@ try:
     import numpy as np
     import hnswlib
 except Exception as e:  # pragma: no cover - defensive
+    # Record a GLOBAL helper-unavailable status file so the worker preflight
+    # (and the viewer diagnostics tab) can show "index build cannot run" with a
+    # real reason, instead of leaving affected records as silent "未向量化".
+    # Per-record vector-errors.json can't be written here: this failure happens
+    # at module-load time, before cmd_build ever runs and before any sqlite_id
+    # is known. This is a process-wide, all-or-nothing failure.
+    import traceback as _tb
+    _env = os.environ
+    try:
+        _home = (_env.get("HOME") or _env.get("USERPROFILE") or "")
+        _data_dir = (_env.get("LLM_MEM_DATA_DIR") or "").strip()
+        if _data_dir:
+            if _data_dir.startswith("~"):
+                _data_dir = os.path.join(_home, _data_dir[1:])
+        else:
+            _data_dir = os.path.join(_home, ".llm-mem")
+        _hnsw_dir = os.path.join(_data_dir, "hnswlib")
+        _trace = _tb.format_exc().strip().splitlines()
+        _stderr_tail = _trace[-1] if _trace else None
+        _payload = json.dumps({
+            "reason": "missing python dependency (hnswlib/numpy): " + str(e),
+            "stderr_tail": _stderr_tail,
+            "recordedAtMs": int(time.time() * 1000),
+        })
+        try:
+            os.makedirs(_hnsw_dir, exist_ok=True)
+        except Exception:
+            pass
+        _status_path = os.path.join(_hnsw_dir, "hnswlib-helper-unavailable.json")
+        with open(_status_path + ".tmp", "w", encoding="utf-8") as _f:
+            _f.write(_payload)
+        try:
+            os.replace(_status_path + ".tmp", _status_path)
+        except Exception:
+            pass
+    except Exception:
+        pass
     print(f"ERROR: missing python dependency (hnswlib/numpy): {e}", file=sys.stderr)
     sys.exit(2)
 
@@ -44,6 +81,26 @@ try:
     import urllib.parse
     import urllib.error
 except Exception:  # pragma: no cover
+    pass
+
+
+# Import succeeded — nuke any stale helper-unavailable marker so a previously
+# broken interpreter does not linger as "index build cannot run" after the user
+# fixed the deps. Cheap and idempotent.
+try:
+    _status = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    _data = os.environ.get("LLM_MEM_DATA_DIR")
+    if _data:
+        _h = os.environ.get("HOME") or os.environ.get("USERPROFILE") or ""
+        _data = os.path.join(_h, _data[1:]) if _data.startswith("~") else _data
+    else:
+        _data = os.path.join(os.environ.get("HOME") or os.environ.get("USERPROFILE") or "", ".llm-mem")
+    _stale = os.path.join(_data, "hnswlib", "hnswlib-helper-unavailable.json")
+    try:
+        os.remove(_stale)
+    except Exception:
+        pass
+except Exception:
     pass
 
 
@@ -160,6 +217,46 @@ def ensure_table(db_path: str):
 
 def _id_map_path(hnsw_dir: str) -> str:
     return os.path.join(hnsw_dir, "id-map.json")
+
+
+def _errors_path(hnsw_dir: str) -> str:
+    return os.path.join(hnsw_dir, "vector-errors.json")
+
+
+def _read_errors(hnsw_dir: str) -> dict[int, str]:
+    p = _errors_path(hnsw_dir)
+    if not os.path.exists(p):
+        return {}
+    try:
+        with open(p) as f:
+            m = json.load(f)
+        return {int(k): str(v) for k, v in m.items()}
+    except Exception:
+        return {}
+
+
+def _save_errors(hnsw_dir: str, by_sqlite_id: dict[int, str]) -> None:
+    os.makedirs(hnsw_dir, exist_ok=True)
+    payload = {str(k): v for k, v in by_sqlite_id.items()}
+    tmp = _errors_path(hnsw_dir) + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f)
+    os.replace(tmp, _errors_path(hnsw_dir))
+
+
+def record_vector_error(hnsw_dir: str, sqlite_id: int, error: str) -> None:
+    """Persist a per-record vectorization failure reason so the viewer can show
+    the concrete cause (e.g. 'Ollama unreachable') instead of a generic badge."""
+    errors = _read_errors(hnsw_dir)
+    errors[int(sqlite_id)] = str(error)
+    _save_errors(hnsw_dir, errors)
+
+
+def clear_vector_error(hnsw_dir: str, sqlite_id: int) -> None:
+    """Drop a per-record error once that record is (re)vectorized successfully."""
+    errors = _read_errors(hnsw_dir)
+    errors.pop(int(sqlite_id), None)
+    _save_errors(hnsw_dir, errors)
 
 
 def _progress_path(hnsw_dir: str) -> str:
@@ -620,6 +717,7 @@ def cmd_sync(args):
                 out["vector_error"] = (
                     f"bad embedding length {len(vec or [])} vs expected dim {expected_dim}"
                 )
+                record_vector_error(hnsw_dir, int(row["sqlite_id"]), out["vector_error"])
             else:
                 meta = {
                     "id": int(row.get("id", 0)),
@@ -631,10 +729,12 @@ def cmd_sync(args):
                     "created_at_epoch": int(row.get("created_at_epoch") or 0),
                 }
                 append_vector_to_index(hnsw_dir, meta, np.array(vec, dtype=np.float32))
+                clear_vector_error(hnsw_dir, int(row["sqlite_id"]))
                 out["vectorized"] = True
         except Exception as e:
             out["vectorized"] = False
             out["vector_error"] = repr(e)
+            record_vector_error(hnsw_dir, int(row["sqlite_id"]), out["vector_error"])
 
     print(json.dumps(out))
 

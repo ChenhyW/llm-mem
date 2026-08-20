@@ -9,6 +9,7 @@ import { USER_SETTINGS_PATH } from '../../shared/paths.js';
 import { buildSpawnSyncInvocation, lookupWindowsCommand } from '../../shared/spawn.js';
 import { IS_WINDOWS } from '../utils/paths.js';
 import { parseJsonWithBom } from '../../shared/atomic-json.js';
+import { IS_WINDOWS_PLATFORM } from '../../shared/atomic-json.js';
 
 const INSTALL_TIMEOUT_MS = (() => {
   const override = process.env.LLM_MEM_INSTALL_TIMEOUT_MS;
@@ -32,7 +33,7 @@ export function platformUvRemediation(): string {
     : 'Install uv manually: `curl -LsSf https://astral.sh/uv/install.sh | sh` (or `brew install uv`), then re-run `npx llm-mem install`.';
 }
 
-function userHasOptedOutOfVectorSearch(): boolean {
+export function userHasOptedOutOfVectorSearch(): boolean {
   // Read the settings file directly (the value is not in the typed defaults).
   // Honors both a top-level key and an `env`-nested key.
   let raw: unknown;
@@ -140,6 +141,162 @@ export function getUvVersion(): string | null {
     console.warn('llm-mem: uv --version probe failed:', err);
     return null;
   }
+}
+
+const HNSWLIB_HACKS = ['--break-system-packages', '--user'];
+
+const HNSWLIB_PYTHON_DEPS: readonly [string, string][] = [
+  ['hnswlib', '1.0.0'],
+  ['numpy', '2.0.0'],
+] as const;
+
+/** Resolve the Python interpreter worker will actually use.
+ * Worker hard-codes `python3` (hnswlib-spawn.ts), so we probe the same
+ * binary to guarantee deps land in the interpreter that will import them. */
+function getWorkerPythonPath(): string | null {
+  return IS_WINDOWS ? lookupWindowsCommand('python') ?? null : getToolPath('python3', []);
+}
+
+function getPythonVersion(): string | null {
+  const path = getWorkerPythonPath();
+  if (!path) return null;
+  try {
+    const out = execSync(`"${path}" --version`, { encoding: 'utf-8', timeout: 8000 }).trim();
+    return out.startsWith('Python ') ? out.slice(7) : (out || null);
+  } catch {
+    return null;
+  }
+}
+
+/** Install a pip package, retrying through the well-known PEP 668 override
+ * (`--break-system-packages`, then `--user`) on macOS / Linux systems that
+ * reject direct installs into the system site-packages. */
+function pipInstall(pythonPath: string, packageSpec: string): void {
+  const pipArgs = [
+    '-m', 'pip', 'install', '--quiet', packageSpec,
+  ];
+  const runPip = (extra: string[] = []): void => {
+    execSync(`"${pythonPath}" ${[...pipArgs, ...extra].join(' ')} 2>&1`, {
+      stdio: 'pipe',
+      timeout: INSTALL_TIMEOUT_MS,
+      shell: IS_WINDOWS ? (process.env.ComSpec ?? 'cmd.exe') : '/bin/bash',
+    });
+  };
+
+  const isSystemProtected = () => {
+    try {
+      runPip();
+      return false;
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const msg = String(err.message || err).toLowerCase();
+      return msg.includes('pep 668') || msg.includes('externally-managed-environment') ||
+        msg.includes('externally managed environment');
+    }
+  };
+
+  if (!IS_WINDOWS_PLATFORM && isSystemProtected()) {
+    // Retry with the PEP 668 override flags in priority order.
+    let lastErr: unknown;
+    for (const hack of HNSWLIB_HACKS) {
+      try {
+        runPip([hack]);
+        return;
+      } catch (error) {
+        lastErr = error;
+      }
+    }
+    throw lastErr;
+  }
+}
+
+export interface HnswlibPythonDepsResult {
+  pythonPath: string;
+  pythonVersion: string;
+  pipVersion: string;
+  hnswlibVersion: string;
+  numpyVersion: string;
+}
+
+export async function ensureHnswlibPythonDeps(
+  summary?: InstallSummary,
+  options: { allowVectorSearchOptOut?: boolean } = {},
+): Promise<HnswlibPythonDepsResult | { pythonPath: string; pythonVersion: string | null; error?: string }> {
+  const sum = summaryOrEphemeral(summary);
+
+  const pythonPath = getWorkerPythonPath() ?? (IS_WINDOWS ? 'python' : 'python3');
+  const pythonVersion = getPythonVersion();
+
+  if (!pythonVersion) {
+    if (options.allowVectorSearchOptOut && userHasOptedOutOfVectorSearch()) {
+      installerError(ErrorSeverity.WARN_CONTINUE, {
+        component: 'python-detect',
+        phase: 'setup-runtime',
+        cause: new Error(`could not resolve python3; vector search disabled — continuing.`),
+      }, sum);
+      return { pythonPath, pythonVersion: null };
+    }
+    throw new Error(
+      'Python interpreter not found. llm-mem needs python3 for vector search. ' +
+        'Install Python 3.10+ and ensure python3 is on PATH, then re-run `npx llm-mem install`.'
+    );
+  }
+
+  const probe = (mod: string, verArg: string): string | null => {
+    try {
+      const out = execSync(`"${pythonPath}" -c "import ${mod}; print(${mod}.${verArg})"`, {
+        encoding: 'utf-8', timeout: 8000,
+      }).trim();
+      return out || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const existingHnsw = probe('hnswlib', '__version__');
+  const existingNumpy = probe('numpy', '__version__');
+  const needsInstall = !existingHnsw || !existingNumpy;
+
+  if (needsInstall) {
+    const runInstall = (): void => {
+      for (const [pkg, _] of HNSWLIB_PYTHON_DEPS) {
+        pipInstall(pythonPath, `${pkg}>=${_}`);
+      }
+    };
+    try {
+      runInstall();
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      if (options.allowVectorSearchOptOut && userHasOptedOutOfVectorSearch()) {
+        installerError(ErrorSeverity.WARN_CONTINUE, {
+          component: 'python-deps-install',
+          phase: 'setup-runtime',
+          cause: err,
+        }, sum);
+        return { pythonPath, pythonVersion };
+      }
+      throw new Error(
+        `Failed to install Python vector-search dependencies (hnswlib/numpy) via ${pythonPath}. ` +
+          `Try manually: \`${pythonPath} -m pip install --break-system-packages "hnswlib>=1.0.0" "numpy>=2.0.0"\`.` +
+          ` Underlying error: ${err.message || String(err)}`
+      );
+    }
+  }
+
+  const hnswlibVersion = probe('hnswlib', '__version__') ?? 'installed';
+  const numpyVersion = probe('numpy', '__version__') ?? 'installed';
+
+  const pipVersion = (() => {
+    try {
+      return execSync(`"${pythonPath}" -m pip --version`, {
+        encoding: 'utf-8', timeout: 8000,
+      }).trim().split(/\s+/).slice(0, 2).join(' ');
+    } catch {
+      return 'installed';
+    }
+  })();
+
+  return { pythonPath, pythonVersion, pipVersion, hnswlibVersion, numpyVersion };
 }
 
 function describeExecError(error: unknown): string {
