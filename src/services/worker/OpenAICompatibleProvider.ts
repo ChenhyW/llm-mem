@@ -143,14 +143,22 @@ export abstract class OpenAICompatibleProvider<TConfig extends { apiKey: string;
     config: TConfig,
     mode: ModeConfig
   ): Promise<void> {
-    const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
-    const batchSize = this._parsePositiveInt(settings.LLM_MEM_OBS_BATCH_SIZE, 1);
-    const batchTimeoutMs = this._parsePositiveInt(settings.LLM_MEM_OBS_BATCH_TIMEOUT_MS, 15_000);
+    const readBatchSettings = () => ({
+      batchSize: this._parsePositiveInt(
+        SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH).LLM_MEM_OBS_BATCH_SIZE,
+        1
+      ),
+      timeoutMs: this._parsePositiveInt(
+        SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH).LLM_MEM_OBS_BATCH_TIMEOUT_MS,
+        15_000
+      )
+    });
+    const { batchSize, timeoutMs: batchTimeoutMs } = readBatchSettings();
 
     let lastCwd: string | undefined;
 
     if (batchSize >= 2) {
-      for await (const batch of this.sessionManager.getBatchIterator(session.sessionDbId, batchSize, batchTimeoutMs)) {
+      for await (const batch of this.sessionManager.getBatchIterator(session.sessionDbId, batchSize, batchTimeoutMs, readBatchSettings)) {
         if (batch.kind === 'summarize') {
           session.pendingAgentId = batch.message.agentId ?? null;
           session.pendingAgentType = batch.message.agentType ?? null;

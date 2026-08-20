@@ -27,6 +27,12 @@ export interface DrainBatchOptions {
   batchSize: number;
   /** Milliseconds to wait for more observations before flushing an in-progress batch. */
   timeoutMs: number;
+  /**
+   * Optional callback re-read each iteration so a batch-size change made via
+   * the settings UI takes effect immediately without a worker restart. When
+   * omitted the static `batchSize` / `timeoutMs` values are used.
+   */
+  readBatchSettings?: () => { batchSize: number; timeoutMs: number };
 }
 
 export type BatchedMessage =
@@ -162,10 +168,25 @@ export class SessionMessageBuffer {
    *    lingering in-progress batch must not be silently dropped.
    */
   async *drainBatches(options: DrainBatchOptions): AsyncIterableIterator<BatchedMessage> {
-    const { sessionDbId, signal, onIdleTimeout, idleTimeoutMs = IDLE_TIMEOUT_MS, batchSize, timeoutMs } = options;
+    const {
+      sessionDbId,
+      signal,
+      onIdleTimeout,
+      idleTimeoutMs = IDLE_TIMEOUT_MS,
+      batchSize: initialBatchSize,
+      timeoutMs: initialTimeoutMs
+    } = options;
     let lastActivityTime = Date.now();
 
     while (!signal.aborted) {
+      // Re-read batch settings on every iteration so a change made via the
+      // settings UI takes effect immediately without a worker restart.
+      const currentSettings = options.readBatchSettings?.() ?? {
+        batchSize: initialBatchSize,
+        timeoutMs: initialTimeoutMs
+      };
+      const { batchSize, timeoutMs } = currentSettings;
+
       const claimed = this.claimNext(sessionDbId);
       if (claimed) {
         lastActivityTime = Date.now();

@@ -402,7 +402,8 @@ export class SessionManager {
   async *getBatchIterator(
     sessionDbId: number,
     batchSize: number,
-    batchTimeoutMs: number
+    batchTimeoutMs: number,
+    readBatchSettings?: () => { batchSize: number; timeoutMs: number }
   ): AsyncIterableIterator<BatchedMessage> {
     let session = this.sessions.get(sessionDbId);
     if (!session) {
@@ -421,7 +422,8 @@ export class SessionManager {
         session.abortController.abort();
       },
       batchSize,
-      timeoutMs: batchTimeoutMs
+      timeoutMs: batchTimeoutMs,
+      readBatchSettings
     })) {
       if (batch.kind === 'normal') {
         for (const msg of batch.messages) {
