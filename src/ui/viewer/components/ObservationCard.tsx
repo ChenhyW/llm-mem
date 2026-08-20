@@ -6,6 +6,8 @@ interface ObservationCardProps {
   observation: Observation;
   vectorizedIds?: number[];
   vectorModel?: string;
+  /** Per-record vectorization failure reasons, keyed by observation id (sqlite_id). */
+  unindexedErrors?: Record<string, string>;
 }
 
 function stripProjectRoot(filePath: string): string {
@@ -27,7 +29,7 @@ function stripProjectRoot(filePath: string): string {
   return parts.length > 3 ? parts.slice(-3).join('/') : filePath;
 }
 
-export function ObservationCard({ observation, vectorizedIds, vectorModel }: ObservationCardProps) {
+export function ObservationCard({ observation, vectorizedIds, vectorModel, unindexedErrors }: ObservationCardProps) {
   const [showFacts, setShowFacts] = useState(false);
   const [showNarrative, setShowNarrative] = useState(false);
   const date = formatDate(observation.created_at_epoch);
@@ -39,6 +41,17 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel }: Obs
   const filesModified = observation.files_modified ? JSON.parse(observation.files_modified).map(stripProjectRoot) : [];
 
   const hasFactsContent = facts.length > 0 || concepts.length > 0 || filesRead.length > 0 || filesModified.length > 0;
+
+  const vectIds = vectorizedIds || [];
+  const vectorized = vectIds.includes(observation.id);
+  const vectorError = unindexedErrors?.[String(observation.id)];
+  const vectorLabel = vectorized
+    ? `已向量化${vectorModel ? ` · ${vectorModel}` : ''}`
+    : vectorError
+      ? `未向量化：${vectorError}`
+      : '未向量化';
+  const vectorColor = vectorized ? '#22c55e' : '#ef4444';
+  const vectorBg = vectorized ? 'rgba(34,197,94,0.12)' : (vectorError ? 'rgba(239,68,68,0.10)' : 'rgba(139,148,158,0.12)');
 
   return (
     <div className="card">
@@ -153,16 +166,17 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel }: Obs
         )}
         {vectorizedIds !== undefined && (
           <span
-            title={vectorizedIds.includes(observation.id) ? '已向量化' : '未向量化'}
+            title={vectorLabel}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 3,
               padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
-              background: vectorizedIds.includes(observation.id) ? 'rgba(34,197,94,0.12)' : 'rgba(139,148,158,0.12)',
-              color: vectorizedIds.includes(observation.id) ? '#22c55e' : '#8b949e',
+              background: vectorBg,
+              color: vectorColor,
             }}
           >
-            {vectorizedIds.includes(observation.id) ? '● 已向量化' : '○ 未向量化'}
-            {vectorizedIds.includes(observation.id) && vectorModel ? ` · ${vectorModel}` : ''}
+            {vectorized ? '● 已向量化' : (vectorError ? '● 未向量化' : '○ 未向量化')}
+            {vectorized && vectorModel ? ` · ${vectorModel}` : ''}
+            {vectorError ? ` · ${vectorError}` : ''}
           </span>
         )}
         {showFacts && (concepts.length > 0 || filesRead.length > 0 || filesModified.length > 0) && (

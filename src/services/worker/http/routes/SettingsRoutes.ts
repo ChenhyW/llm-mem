@@ -148,9 +148,22 @@ export class SettingsRoutes extends BaseRouteHandler {
         ?? SettingsDefaultsManager.getAllDefaults().LLM_MEM_VECTOR_EMBEDDING_MODEL;
       const hnswDir = getHnswDir();
       const idMapPath = path.join(hnswDir, 'id-map.json');
+      const errorMapPath = path.join(hnswDir, 'vector-errors.json');
+
+      const errorsBySqliteId: Record<string, string> = {};
+      try {
+        if (existsSync(errorMapPath)) {
+          const errorMap = readJsonFileWithBom<Record<string, string>>(errorMapPath);
+          for (const [k, v] of Object.entries(errorMap)) {
+            if (typeof v === 'string') errorsBySqliteId[String(k)] = v;
+          }
+        }
+      } catch {
+        // Non-critical; fall back to a clean error map.
+      }
 
       if (!existsSync(idMapPath)) {
-        res.json({ indexed: 0, model, indexed_ids: [], healthy: false });
+        res.json({ indexed: 0, model, indexed_ids: [], unindexed_errors: errorsBySqliteId, healthy: false });
         return;
       }
 
@@ -160,6 +173,7 @@ export class SettingsRoutes extends BaseRouteHandler {
         indexed: ids.length,
         model,
         indexed_ids: ids,
+        unindexed_errors: errorsBySqliteId,
         healthy: true,
       });
     } catch (err) {
@@ -167,6 +181,7 @@ export class SettingsRoutes extends BaseRouteHandler {
         indexed: 0,
         model: 'unknown',
         indexed_ids: [],
+        unindexed_errors: {},
         healthy: false,
         error: err instanceof Error ? err.message : String(err),
       });

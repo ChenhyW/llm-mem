@@ -70,6 +70,21 @@ export function PromptCard({ prompt }: PromptCardProps) {
       <div className="card-content">
         {prompt.prompt_text}
       </div>
+      <div className="prompt-semantic-injection">
+        <div className="prompt-semantic-injection-summary">
+          <span>🔍 语义注入（拼入了 {sectionCount} 条相关记忆）</span>
+          {hasSemanticContext ? (
+            <button
+              className="prompt-semantic-injection-toggle"
+              onClick={() => setShowInjection(true)}
+            >
+              查看注入内容
+            </button>
+          ) : (
+            <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>无相关记忆</span>
+          )}
+        </div>
+      </div>
       {hasSemanticContext && showInjection && (
         <div className="prompt-semantic-injection">
           <div className="prompt-semantic-injection-summary">

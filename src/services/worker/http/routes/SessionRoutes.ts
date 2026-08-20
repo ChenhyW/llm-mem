@@ -492,7 +492,21 @@ export class SessionRoutes extends BaseRouteHandler {
     // non-cursor branch below entirely.
     this.dbManager.getCloudSync()?.notify();
 
-    const contextInjected = this.sessionManager.getSession(sessionDbId) !== undefined;
+    // Semantic memory injection (worker-driven, #context-injection):
+    // render the timeline context directly from the local SQLite DB
+    // (does NOT depend on Chroma), persist it onto the user prompt so the
+    // viewer PromptCard can surface it, and — for the SDK path — splice it
+    // into the prompt the LLM actually sees.  Non-blocking: any error here
+    // skips injection but never derails session initialization.
+    const injectedContext = await this.injectSemanticContext(
+      sessionDbId,
+      promptNumber,
+      project,
+      platformSource,
+      cleanedPrompt
+    );
+
+    const contextInjected = !!injectedContext;
 
     logger.debug('SESSION', 'User prompt saved', {
       sessionId: sessionDbId,
@@ -502,7 +516,10 @@ export class SessionRoutes extends BaseRouteHandler {
 
     if (platformSource !== 'cursor') {
       const sdkPrompt = cleanedPrompt.startsWith('/') ? cleanedPrompt.substring(1) : cleanedPrompt;
-      const session = this.sessionManager.initializeSession(sessionDbId, sdkPrompt, promptNumber, project);
+      const sdkPromptWithMemory = injectedContext
+        ? `${injectedContext}\n\n<prior_context>See the "Relevant Past Work" context above; ground your answer in it where relevant.</prior_context>\n\n<sdk_user_request>${sdkPrompt}</sdk_user_request>`
+        : sdkPrompt;
+      const session = this.sessionManager.initializeSession(sessionDbId, sdkPromptWithMemory, promptNumber, project);
 
       const latestPrompt = store.getLatestUserPrompt(session.contentSessionId, sessionDbId);
 
@@ -564,6 +581,95 @@ export class SessionRoutes extends BaseRouteHandler {
   private static readonly SIMPLE_TOOLS = new Set([
     'Read', 'Glob', 'Grep', 'LS', 'ListMcpResourcesTool'
   ]);
+
+  /**
+   * Worker-driven semantic memory injection (#context-injection).
+   *
+   * Replaces the previous CLI-hook-driven path: that path both used the
+   * Chroma-dependent /api/context/semantic endpoint (which can return empty
+   * when Chroma is unhealthy) and only fired on the very first prompt of a
+   * session, leaving every user_prompt's semantic_context empty so the
+   * viewer PromptCard never had anything to display.
+   *
+   * Here we render the timeline context directly from the local SQLite DB
+   * (the same source the /api/context/inject hook already uses), then:
+   *   1. persist it onto the user_prompt record (so PromptCard displays it),
+   *   2. for the SDK path, splice it into the conversation prompt the LLM
+   *      actually reads.
+   *
+   * Always returns the injected context text (possibly '') for the caller to
+   * splice into the SDK conversation. Never throws — failures skip injection.
+   */
+  private async injectSemanticContext(
+    sessionDbId: number,
+    promptNumber: number,
+    project: string,
+    platformSource: string,
+    cleanedPrompt: string
+  ): Promise<string> {
+    const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);
+    const enabled = String(settings.LLM_MEM_SEMANTIC_INJECT ?? '').toLowerCase() === 'true';
+    if (!enabled) {
+      return '';
+    }
+
+    const minChars = parseInt(String(settings.LLM_MEM_SEMANTIC_INJECT_MIN_CHARS ?? '20'), 10) || 20;
+    if (cleanedPrompt.length < minChars) {
+      logger.debug('SESSION', 'Semantic injection skipped: prompt too short', {
+        sessionId: sessionDbId,
+        promptNumber,
+        promptLength: cleanedPrompt.length,
+        minChars
+      });
+      return '';
+    }
+
+    try {
+      const { generateContextWithStats } = require('../../../context-generator.js');
+
+      const result = generateContextWithStats({
+        cwd: `/context/${project}`,
+        projects: [project],
+        ...(platformSource ? { platformSource } : {}),
+      });
+
+      const ctxText = (await result).text || '';
+
+      if (!ctxText) {
+        logger.debug('SESSION', 'Semantic injection: empty context (no relevant history)', {
+          sessionId: sessionDbId,
+          promptNumber,
+        });
+        return '';
+      }
+
+      // Persist onto the prompt record so the viewer PromptCard can display it.
+      const store = this.dbManager.getSessionStore();
+      try {
+        store.setPromptSemanticContext(sessionDbId, promptNumber, ctxText);
+      } catch (err) {
+        logger.warn('SESSION', 'Failed to persist semantic context for prompt', {
+          sessionId: sessionDbId,
+          promptNumber,
+        }, err instanceof Error ? err : new Error(String(err)));
+      }
+
+      logger.info('SESSION', 'Semantic memory injected', {
+        sessionId: sessionDbId,
+        promptNumber,
+        project,
+        contextChars: ctxText.length,
+      });
+
+      return ctxText;
+    } catch (err) {
+      logger.warn('SESSION', 'Semantic memory injection failed (non-blocking)', {
+        sessionId: sessionDbId,
+        promptNumber,
+      }, err instanceof Error ? err : new Error(String(err)));
+      return '';
+    }
+  }
 
   private async applyTierRouting(session: NonNullable<ReturnType<typeof this.sessionManager.getSession>>): Promise<void> {
     const settings = SettingsDefaultsManager.loadFromFile(USER_SETTINGS_PATH);

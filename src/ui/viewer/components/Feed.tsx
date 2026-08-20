@@ -20,12 +20,19 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
   const feedRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);
 
-  // Vector index stats: which observation sqlite_ids are vectorized
-  const [vectorStats, setVectorStats] = useState<{ indexed_ids: number[]; model: string } | null>(null);
+  // Vector index stats: which observation sqlite_ids are vectorized, plus
+  // per-record reasons for those that failed to vectorize.
+  const [vectorStats, setVectorStats] = useState<{ indexed_ids: number[]; model: string; unindexed_errors: Record<string, string> } | null>(null);
   useEffect(() => {
     fetch('/api/vector/stats')
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setVectorStats({ indexed_ids: d.indexed_ids || [], model: d.model || 'unknown' }); })
+      .then(d => {
+        if (d) setVectorStats({
+          indexed_ids: d.indexed_ids || [],
+          model: d.model || 'unknown',
+          unindexed_errors: d.unindexed_errors || {}
+        });
+      })
       .catch(() => {});
   }, [observations.length]);
 
@@ -74,7 +81,7 @@ export function Feed({ observations, summaries, prompts, onLoadMore, isLoading, 
         {items.map(item => {
           const key = `${item.itemType}-${item.id}`;
           if (item.itemType === 'observation') {
-            return <ObservationCard key={key} observation={item} vectorizedIds={vectorStats?.indexed_ids} vectorModel={vectorStats?.model} />;
+            return <ObservationCard key={key} observation={item} vectorizedIds={vectorStats?.indexed_ids} vectorModel={vectorStats?.model} unindexedErrors={vectorStats?.unindexed_errors} />;
           } else if (item.itemType === 'summary') {
             return <SummaryCard key={key} summary={item} />;
           } else {
