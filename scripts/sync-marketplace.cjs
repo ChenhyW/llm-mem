@@ -28,6 +28,17 @@ function getGitignoreExcludes(basePath) {
   if (!existsSync(gitignorePath)) return '';
 
   const syncManagedFiles = new Set();
+  // Patterns the sync script handles with its own dedicated rsync rules
+  // further down, or that would over-exclude by matching too broadly at
+  // the root-Directory rsync step.  Do NOT turn these into --exclude flags
+  // for the root sync: e.g. `.gitignore`'s bare `plugin/` would make rsync
+  // skip the entire plugin/ tree at the top-level sync, leaving
+  // plugin/skills/ and plugin/ui/ absent in the installed marketplace
+  // copy (they are synced explicitly by the per-subdir rsync below).
+  const rootRsyncMustNotExclude = new Set([
+    'plugin',
+    'plugin/',
+  ]);
 
   const lines = readFileSync(gitignorePath, 'utf-8').split('\n');
   return lines
@@ -36,7 +47,8 @@ function getGitignoreExcludes(basePath) {
       line &&
       !line.startsWith('#') &&
       !line.startsWith('!') &&
-      !syncManagedFiles.has(line)
+      !syncManagedFiles.has(line) &&
+      !rootRsyncMustNotExclude.has(line)
     )
     .map(pattern => `--exclude=${JSON.stringify(pattern)}`)
     .join(' ');
