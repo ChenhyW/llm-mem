@@ -8,6 +8,14 @@ interface ObservationCardProps {
   vectorModel?: string;
   /** Per-record vectorization failure reasons, keyed by observation id (sqlite_id). */
   unindexedErrors?: Record<string, string>;
+  /** Real output-position badge for this observation's LLM batch:
+   *   pos   = this observation's 1-based position among the observations
+   *            the LLM actually emitted for this batch
+   *   total = how many observations the LLM emitted in total for this batch
+   * When total == 1 the badge is intentionally hidden. When null/undefined
+   * (streaming / partial load), the card falls back to the legacy input-side
+   * badge so the card still renders deterministically. */
+  batchPosition?: { pos: number; total: number } | null;
 }
 
 function stripProjectRoot(filePath: string): string {
@@ -29,7 +37,7 @@ function stripProjectRoot(filePath: string): string {
   return parts.length > 3 ? parts.slice(-3).join('/') : filePath;
 }
 
-export function ObservationCard({ observation, vectorizedIds, vectorModel, unindexedErrors }: ObservationCardProps) {
+export function ObservationCard({ observation, vectorizedIds, vectorModel, unindexedErrors, batchPosition }: ObservationCardProps) {
   const [showFacts, setShowFacts] = useState(false);
   const [showNarrative, setShowNarrative] = useState(false);
   const date = formatDate(observation.created_at_epoch);
@@ -145,25 +153,58 @@ export function ObservationCard({ observation, vectorizedIds, vectorModel, unind
             {tokens}
           </span>
         )}
-        {(observation.batch_size ?? 0) > 1 && (
-          <span
-            title={`批次产出 · 第 ${observation.batch_index ?? 1}/${observation.batch_size} 条`}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
-              background: 'rgba(56,189,248,0.14)',
-              color: '#38bdf8',
-            }}
-          >
-            <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
-              <rect x="0" y="0" width="4" height="4" fill="currentColor"/>
-              <rect x="6" y="0" width="4" height="4" fill="currentColor"/>
-              <rect x="0" y="6" width="4" height="4" fill="currentColor"/>
-              <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
-            </svg>
-            批 {observation.batch_index ?? 1}/{observation.batch_size}
-          </span>
-        )}
+        {(() => {
+          const pos = batchPosition ?? null;
+          const total = pos?.total;
+          // Prefer the real output-position badge. Hide it for single-output
+          // batches (total == 1) since "第 1/1 条" adds no information.
+          if (pos && total !== 1) {
+            return (
+              <span
+                title={`LLM 本批产出 · 第 ${pos.pos} / ${total} 条 observation`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+                  background: 'rgba(56,189,248,0.14)',
+                  color: '#38bdf8',
+                }}
+              >
+                <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
+                  <rect x="0" y="0" width="4" height="4" fill="currentColor"/>
+                  <rect x="6" y="0" width="4" height="4" fill="currentColor"/>
+                  <rect x="0" y="6" width="4" height="4" fill="currentColor"/>
+                  <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
+                </svg>
+                产出 {pos.pos}/{total}
+              </span>
+            );
+          }
+          // Legacy fallback: input-side tool-call count. Only shown when
+          // batch_size > 1, with the clarifying "输入" label so users don't
+          // mistake tool-call count for observation count.
+          if ((observation.batch_size ?? 0) > 1) {
+            return (
+              <span
+                title={`LLM 本批输入 · 第 ${observation.batch_index ?? 1} / ${observation.batch_size} 个 tool call`}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 500,
+                  background: 'rgba(107,114,128,0.14)',
+                  color: '#6b7280',
+                }}
+              >
+                <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true">
+                  <rect x="0" y="0" width="4" height="4" fill="currentColor"/>
+                  <rect x="6" y="0" width="4" height="4" fill="currentColor"/>
+                  <rect x="0" y="6" width="4" height="4" fill="currentColor"/>
+                  <rect x="6" y="6" width="4" height="4" fill="currentColor"/>
+                </svg>
+                输入 {observation.batch_index ?? 1}/{observation.batch_size}
+              </span>
+            );
+          }
+          return null;
+        })()}
         {vectorizedIds !== undefined && (
           <span
             title={vectorLabel}
